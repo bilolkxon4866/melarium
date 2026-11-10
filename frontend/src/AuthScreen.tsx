@@ -74,7 +74,7 @@ export default function AuthScreen({ onAuthenticated, onBack }: Props) {
               <small id="auth-phone-hint" className="auth-hint">O‘zbekiston raqami, masalan 90 123 45 67</small>
               {error && <div className="auth-error" role="alert">{error}</div>}
               <button className="button button-primary auth-submit" type="submit" disabled={busy}>{busy ? <LoaderCircle size={16} className="spin" /> : null} Kod yuborish <ArrowRight size={16} /></button>
-              <div className="auth-legal">Davom etish orqali platformadan foydalanish qoidalariga rozilik bildirasiz. Investitsiya shartlari va moliyaviy jarayonlar alohida tasdiqlanmaguncha to‘lov olinmaydi.</div>
+              <div className="auth-legal">Davom etish orqali platformadan foydalanish qoidalariga rozilik bildirasiz.</div>
             </form>
           ) : (
             <form className="auth-form" onSubmit={submitCode}>

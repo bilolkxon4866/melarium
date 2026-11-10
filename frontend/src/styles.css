@@ -329,6 +329,7 @@ img { display: block; max-width: 100%; }
 .report-toolbar select { height: 30px; padding: 0 9px; border: 1px solid #e6ece5; border-radius: 6px; color: #5e7161; background: #fff; font-size: 9px; }
 .report-toolbar .button { margin-left: auto; min-height: 30px; }
 .report-grid { margin-top: 0; }
+.report-grid-single { grid-template-columns: minmax(0, 1fr); }
 .report-insight { padding: 17px; }
 .report-progress { margin: 16px 0; }
 .report-progress-header { margin-bottom: 7px; display: flex; justify-content: space-between; color: #7e8e81; font-size: 9px; }

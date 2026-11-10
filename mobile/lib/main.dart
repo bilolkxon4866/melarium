@@ -240,10 +240,6 @@ class _GuestHomeState extends State<_GuestHome> {
                                   subtitle: 'Muhim ma’lumotlar'),
                               const SizedBox(height: 10),
                               const _FaqItem(
-                                  question: 'Daromad kafolatlanadimi?',
-                                  answer:
-                                      'Yo‘q. Takliflar moliyaviy natijani va’da qilmaydi. Tasdiqlangan shartlar va to‘lov provayderi bo‘lmaguncha haqiqiy to‘lov qabul qilinmaydi.'),
-                              const _FaqItem(
                                   question:
                                       'Sensor ko‘rsatkichlari avtomatik keladimi?',
                                   answer:
@@ -256,9 +252,6 @@ class _GuestHomeState extends State<_GuestHome> {
                                   onTap: _openAuth),
                             ]))),
                 const SizedBox(height: 12),
-                const _WarningCard(
-                    text:
-                        'Haqiqiy investitsiya, to‘lov yoki daromad va’dasi berilmaydi. Tizim MVP sifatida sozlangan.'),
               ],
             ),
           );
@@ -963,7 +956,7 @@ class _OverviewPage extends StatelessWidget {
                   Icons.schedule_rounded
                 ),
                 (
-                  'Faol asosiy summa',
+                  'Faol buyurtmalar qiymati',
                   formatMoney(
                       numberValue(investorReport['activePrincipalAmount'])),
                   Icons.savings_outlined
@@ -1119,9 +1112,6 @@ class _OverviewPage extends StatelessWidget {
                   label: const Text('Tizim holati')),
           ]),
           const SizedBox(height: 8),
-          const _WarningCard(
-              text:
-                  'Moliyaviy natija kafolatlanmaydi. Bu mobil ilova serverdagi qaydlarni ko‘rsatadi; provider yoqilmaguncha haqiqiy to‘lov hisoblanmaydi.'),
         ]);
   }
 }
@@ -1183,9 +1173,6 @@ class _MarketplacePageState extends State<_MarketplacePage> {
               child:
                   _ListingCard(item: item, onTap: () => _openDetails(item)))),
           const SizedBox(height: 12),
-          const _WarningCard(
-              text:
-                  'Listing yoki vaqtinchalik rezervatsiya investitsiya, daromad yoki haqiqiy to‘lovni anglatmaydi.'),
         ]);
   }
 
@@ -1209,7 +1196,7 @@ class _MarketplacePageState extends State<_MarketplacePage> {
         'idempotencyKey': 'mobile-${DateTime.now().microsecondsSinceEpoch}',
       });
       if (mounted) Navigator.of(context).pop();
-      widget.onMessage('Vaqtinchalik buyurtma yaratildi. Mablag‘ olinmadi.');
+      widget.onMessage('Buyurtma yaratildi.');
       await widget.onChanged();
     } catch (error) {
       widget.onMessage(error.toString());
@@ -1258,9 +1245,6 @@ class _ListingDetails extends StatelessWidget {
                         icon: Icons.hive_outlined))
               ]),
               const SizedBox(height: 14),
-              const _WarningCard(
-                  text:
-                      'Taklif moliyaviy natijani kafolatlamaydi. To‘lov provayderi va shartlar yoqilmagan.'),
               if (isInvestor && onReserve != null) ...[
                 const SizedBox(height: 12),
                 SizedBox(
@@ -1268,7 +1252,7 @@ class _ListingDetails extends StatelessWidget {
                     child: FilledButton.icon(
                         onPressed: () => onReserve!(),
                         icon: const Icon(Icons.bookmark_add_outlined),
-                        label: const Text('1 birlikni vaqtincha band qilish'))),
+                        label: const Text('Buyurtma berish'))),
               ],
             ]));
   }
@@ -1297,7 +1281,7 @@ class _InvestmentsPage extends StatelessWidget {
               icon: Icons.account_balance_wallet_outlined,
               title: 'Buyurtma yo‘q',
               text:
-                  'Faol listingni tanlab, faqat vaqtinchalik rezervatsiya yaratish mumkin.'),
+                  'Faol listingni tanlab buyurtma yarating.'),
         ...investments.map((item) => Padding(
             padding: const EdgeInsets.only(bottom: 9),
             child: Card(
@@ -1317,16 +1301,12 @@ class _InvestmentsPage extends StatelessWidget {
                   ? () => _cancel(context, item)
                   : null,
             )))),
-        if (investments.any((item) => item['status'] == 'PENDING_PAYMENT'))
-          const _WarningCard(
-              text:
-                  'Kutilayotgan buyurtma vaqtinchalik rezervatsiya. To‘lov qilinmagan; satrni uzoq bosib bekor qilish mumkin.'),
       ]);
 
   Future<void> _cancel(BuildContext context, Map<String, dynamic> item) async {
     try {
       await api.delete('/investments/${item['id']}');
-      onMessage('Buyurtma bekor qilindi. Mablag‘ olinmagan.');
+      onMessage('Buyurtma bekor qilindi.');
       await onChanged();
     } catch (error) {
       onMessage(error.toString());
@@ -1343,24 +1323,22 @@ class _PaymentsPage extends StatelessWidget {
       ListView(padding: const EdgeInsets.all(16), children: [
         _SectionHeader(
             title: admin ? 'To‘lov qaydlari' : 'To‘lovlarim',
-            subtitle:
-                'Faqat backend tomonidan qayd etilgan provider holatlari'),
+            subtitle: admin
+                ? 'Serverda qayd etilgan to‘lov yozuvlari'
+                : 'Hisobingizga bog‘langan to‘lov yozuvlari'),
         const SizedBox(height: 12),
         if (payments.isEmpty)
           const _EmptyCard(
               icon: Icons.credit_card_off_outlined,
               title: 'To‘lov qaydi yo‘q',
               text:
-                  'Haqiqiy payment provider ulanmagan yoki hali tranzaksiya bo‘lmagan.'),
+                  'Tranzaksiya yozuvlari paydo bo‘lgach shu yerda ko‘rinadi.'),
         ...payments.map((item) => _SimpleDataTile(
             title: textValue(item['provider'], 'Provider'),
             subtitle:
                 '${labelStatus(textValue(item['status'], ''))} · ${textValue(item['createdAt'], '')}',
             trailing: formatMoney(numberValue(item['amount'])))),
         const SizedBox(height: 12),
-        const _WarningCard(
-            text:
-                'Bu sahifa payment-provider credentials mavjud bo‘lmaganda haqiqiy tranzaksiya bajarilmaydi. To‘lovning huquqiy shartlarini loyiha egasi tasdiqlashi shart.'),
       ]);
 }
 
@@ -2323,10 +2301,10 @@ class _ReportsPage extends StatelessWidget {
             subtitle: 'Serverdan olingan jamlanma ma’lumotlar'),
         _SimpleDataTile(
             title: role == 'INVESTOR'
-                ? 'Faol investitsiya asosiy summasi'
+                ? 'Faol buyurtmalar qiymati'
                 : 'Jami hosil',
             subtitle: role == 'INVESTOR'
-                ? 'Daromad ko‘rsatkichi emas'
+                ? 'Faol investitsiya yozuvlari'
                 : 'Yuborilgan hosil hisobotlari',
             trailing: role == 'INVESTOR'
                 ? formatMoney(numberValue(report['activePrincipalAmount']))
@@ -2342,9 +2320,6 @@ class _ReportsPage extends StatelessWidget {
               subtitle: 'Qayd etilgan jami',
               trailing: formatMoney(
                   numberValue(asMap(data['beekeeperReport'])['expensesUzs']))),
-        const _WarningCard(
-            text:
-                'Hisobot ma’lumotlari moliyaviy natija yoki kelgusi hosilni kafolatlamaydi.'),
       ]);
 }
 
