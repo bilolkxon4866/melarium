@@ -13,6 +13,7 @@ Oxirgi yangilanish: **2026-11-04**
 - [x] Flutter Android/iOS mobil ilovasining manba kodi: API client, OTP/session, secure token storage va role-based ekranlar.
 - [x] Uzbek Latin UI matnlari tekshirildi; tekshirilgan source va README fayllarida kirill belgisi topilmadi.
 - [x] Android arm64 debug APK build qilindi. Ilova nomi `MELARIUM`.
+- [x] Loyiha manba kodi GitHub’dagi `bilolkxon4866/melarium` reposining `main` branch’iga push qilindi (boshlang‘ich commit: `89ace5c`).
 
 ## Tekshiruv natijalari
 
@@ -31,7 +32,7 @@ Oxirgi yangilanish: **2026-11-04**
 - [ ] SMS, push, payment gateway/webhook va IoT qurilmalarining haqiqiy integratsiyasi: provider credentials va shartnomalar berilmagani uchun haqiqiy oqimlar yoqilmagan.
 - [ ] Investitsiyaning huquqiy modeli, ROI/daromad, xavf, refund va KYC shartlarini loyiha egasi tasdiqlashi kerak. Tasdiqlanmaguncha daromad kafolatlanmaydi va real pul oqimi yoqilmaydi.
 - [ ] Haqiqiy browser/device UAT, production deploy, monitoring va backup rejasi.
-- [ ] `https://github.com/bilolkxon4866/melarium.git` public repositorysi mavjud va bo‘sh; push autentifikatsiya sozlangach bajariladi. Loyiha hozircha GitHub’ga yuborilmagan.
+
 
 ## Yetkazib berish fayllari
 
