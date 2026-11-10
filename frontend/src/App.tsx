@@ -1010,7 +1010,91 @@ function ProfilePage({ user, role, onSave }: { user: UserProfile; role: Role; on
   const [email, setEmail] = useState(user.email || '');
   useEffect(() => { setFullName(user.fullName || ''); setEmail(user.email || ''); }, [user.id, user.fullName, user.email]);
   const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSave(fullName.trim(), email.trim()); };
-  return <><PageHeading eyebrow="SHAXSIY KABINET" title="Profil va sozlamalar" description="Hisob ma’lumotlarini ko‘ring va tahrirlang." /><div className="profile-layout"><section className="panel profile-card"><div className="profile-cover"><div className="profile-avatar">{initials(user.fullName || user.phone)}</div></div><form className="profile-main" onSubmit={submit}><h2>{user.fullName || 'Ism kiritilmagan'}</h2><span className="profile-role">{ROLE_LABELS[role]}</span><p>Telefon raqam OTP orqali tasdiqlangan hisob bilan bog‘langan.</p><div className="profile-details"><div><span>Telefon raqam</span><strong>{user.phone}</strong></div><div><span>Elektron pochta</span><strong>{user.email || 'Kiritilmagan'}</strong></div><div><span>Ro‘yxatdan o‘tgan</span><strong>{formatDate(user.createdAt)}</strong></div><div><span>Hisob holati</span><strong className={user.accountStatus === 'ACTIVE' ? 'profile-green' : ''}>{labelStatus(user.accountStatus)}</strong></div></div><label>Ism familiya<input value={fullName} onChange={(event) => setFullName(event.target.value)} maxLength={160} required /></label><label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} /></label><button className="button button-outline" type="submit">Ma’lumotlarni saqlash</button></form></section><section className="panel profile-security"><div className="panel-heading"><div><div className="panel-kicker">HISOB XAVFSIZLIGI</div><h2>Kirish va tasdiqlash</h2></div><ShieldCheck size={20} className="profile-security-icon" /></div><div className="security-row"><span className="security-icon"><PhoneIcon /></span><div><strong>Telefon raqam</strong><span>{user.phone}</span></div><span className="status-chip status-green"><span />OTP orqali</span></div><div className="security-row"><span className="security-icon"><ShieldCheck size={17} /></span><div><strong>Hisob holati</strong></div><span className={`status-chip ${user.accountStatus === 'ACTIVE' ? 'status-green' : 'status-honey'}`}><span />{labelStatus(user.accountStatus)}</span></div><div className="profile-security-note"><CircleHelp size={15} /> Sessiyani yakunlash uchun chap pastdagi chiqish tugmasidan foydalaning.</div></section></div></>;
+  const hasName = Boolean(user.fullName?.trim());
+  const profileName = user.fullName?.trim() || 'Ism kiritilmagan';
+  const accountActive = user.accountStatus === 'ACTIVE';
+  const accountStatus = labelStatus(user.accountStatus);
+
+  return (
+    <>
+      <PageHeading eyebrow="SHAXSIY KABINET" title="Profil va sozlamalar" description="Profil ma’lumotlarini yangilang va hisob holatini ko‘ring." />
+      <div className="profile-layout">
+        <section className="panel profile-card">
+          <div className="profile-cover"><span className="profile-cover-label">MELARIUM · SHAXSIY KABINET</span></div>
+          <form className="profile-main" onSubmit={submit}>
+            <div className="profile-identity">
+              <div className="profile-avatar">{hasName ? initials(profileName) : 'M'}</div>
+              <div className="profile-identity-copy">
+                <h2>{profileName}</h2>
+                <span className="profile-role">{ROLE_LABELS[role]}</span>
+              </div>
+              <span className={`profile-account-pill ${accountActive ? 'is-active' : 'is-inactive'}`}>
+                <span className="profile-account-dot" />{accountStatus}
+              </span>
+            </div>
+            <p className="profile-intro">Telefon raqam ushbu shaxsiy kabinetga bog‘langan.</p>
+            <div className="profile-details" aria-label="Hisob ma’lumotlari">
+              <div className="profile-detail"><span>Telefon raqam</span><strong>{user.phone}</strong></div>
+              <div className="profile-detail"><span>Elektron pochta</span><strong>{user.email || 'Kiritilmagan'}</strong></div>
+              <div className="profile-detail"><span>Ro‘yxatdan o‘tgan</span><strong>{formatDate(user.createdAt)}</strong></div>
+              <div className="profile-detail"><span>Hisob holati</span><strong className={accountActive ? 'profile-green' : ''}>{accountStatus}</strong></div>
+            </div>
+            <div className="profile-edit-section">
+              <div className="profile-edit-heading">
+                <div><h3>Shaxsiy ma’lumotlar</h3><p>Ism va email manzilingizni kiriting.</p></div>
+              </div>
+              <div className="profile-edit-grid">
+                <label className="profile-field">Ism familiya
+                  <input name="fullName" autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} maxLength={160} placeholder="Ism familiyangiz" required />
+                </label>
+                <label className="profile-field">Elektron pochta
+                  <input name="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} placeholder="name@example.com" />
+                </label>
+              </div>
+              <div className="profile-edit-actions">
+                <button className="button button-primary profile-save" type="submit"><Check size={16} /> Ma’lumotlarni saqlash</button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <section className="panel profile-security">
+          <div className="profile-security-header">
+            <div>
+              <div className="panel-kicker">HISOB XAVFSIZLIGI</div>
+              <h2>Kirish va tasdiqlash</h2>
+              <p>Hisobingizga kirish ma’lumotlari.</p>
+            </div>
+            <span className="profile-security-icon"><ShieldCheck size={21} /></span>
+          </div>
+          <div className={`profile-security-status ${accountActive ? 'is-active' : 'is-inactive'}`}>
+            <span className="profile-security-status-icon"><ShieldCheck size={23} /></span>
+            <div className="profile-security-status-copy">
+              <span>Hisob holati</span>
+              <strong>{accountStatus}</strong>
+              <p>{accountActive ? 'Hisobingiz faol.' : 'Hisobingiz holati bo‘yicha yordam xizmatiga murojaat qiling.'}</p>
+            </div>
+          </div>
+          <div className="profile-security-list">
+            <div className="security-row">
+              <span className="security-icon"><PhoneIcon /></span>
+              <div><strong>Telefon raqami</strong><span>{user.phone}</span></div>
+              <span className="security-tag"><CheckCircle2 size={14} /> OTP</span>
+            </div>
+            <div className="security-row">
+              <span className="security-icon"><ShieldCheck size={18} /></span>
+              <div><strong>Kirish usuli</strong><span>Bir martalik tasdiqlash kodi</span></div>
+              <span className="security-tag">Faol</span>
+            </div>
+          </div>
+          <div className="profile-security-note">
+            <CircleHelp size={17} />
+            <div><strong>Hisobingizni himoya qiling</strong><span>Tasdiqlash kodini boshqa odamga bermang. Ish tugagach, chap menyudagi chiqish tugmasidan foydalaning.</span></div>
+          </div>
+        </section>
+      </div>
+    </>
+  );
 }
 
 function PhoneIcon() {
