@@ -37,7 +37,7 @@ class ApiClient {
     final access = data['accessToken'] as String?;
     final refresh = data['refreshToken'] as String?;
     if (access == null || refresh == null) {
-      throw const ApiException('Server sessiya tokenlarini qaytarmadi.');
+      throw const ApiException('Kirish sessiyasini tiklab bo‘lmadi.');
     }
     _accessToken = access;
     _refreshToken = refresh;
@@ -125,7 +125,7 @@ class ApiClient {
       response = await http.Response.fromStream(await _client.send(request));
     } catch (_) {
       throw const ApiException(
-          'Backend bilan bog‘lanib bo‘lmadi. API manzili va tarmoqni tekshiring.');
+          'So‘rovni bajarib bo‘lmadi.');
     }
 
     if (response.statusCode == 401 &&
@@ -148,7 +148,13 @@ class ApiClient {
           payload is Map<String, dynamic> && payload['message'] is String
               ? payload['message'] as String
               : 'So‘rov bajarilmadi (${response.statusCode})';
-      throw ApiException(message, response.statusCode);
+      final safeMessage = RegExp(
+                  r'\b(?:api|backend|server|postgres(?:ql)?|database|connection|connected)\b',
+                  caseSensitive: false)
+              .hasMatch(message)
+          ? 'So‘rovni bajarib bo‘lmadi.'
+          : message;
+      throw ApiException(safeMessage, response.statusCode);
     }
     return payload;
   }

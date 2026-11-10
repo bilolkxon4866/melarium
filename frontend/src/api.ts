@@ -76,11 +76,6 @@ export interface AdminDashboardDto {
   activeListings: number; pendingListings: number; pendingOrders: number; paymentReviewOrders: number;
   activeInvestments: number; pendingPayments: number; successfulPayments: number; submittedHarvestReports: number;
 }
-export interface AdminSystemStatusDto {
-  timezone: string; demoMode: boolean; smsProvider: string; smsConfigured: boolean; otpCodeExposureEnabled: boolean;
-  investmentTermsConfigured: boolean; paymentsEnabled: boolean; configuredPaymentProviders: string[];
-  bootstrapAdminConfigured: boolean; pushConfigured: boolean; automaticIotConfigured: boolean;
-}
 export interface NotificationPreferencesDto {
   investmentUpdates: boolean; reportUpdates: boolean; marketingUpdates: boolean; pushEnabled: boolean; updatedAt: string;
 }
@@ -109,7 +104,9 @@ export function clearSession() {
 
 function errorMessage(payload: unknown, fallback: string) {
   if (payload && typeof payload === 'object' && 'message' in payload && typeof (payload as { message?: unknown }).message === 'string') {
-    return (payload as { message: string }).message;
+    const message = (payload as { message: string }).message;
+    if (/\b(?:api|backend|server|postgres(?:ql)?|database|connection|connected)\b/i.test(message)) return fallback;
+    return message;
   }
   return fallback;
 }
@@ -147,7 +144,7 @@ async function send<T>(path: string, init: RequestInit = {}, retry = true): Prom
   try {
     response = await fetch(`${API_BASE}${path}`, { ...init, headers, cache: 'no-store' });
   } catch {
-    throw new ApiClientError('Server bilan bog‘lanib bo‘lmadi. API manzili va backend holatini tekshiring.', 0);
+    throw new ApiClientError('So‘rovni bajarib bo‘lmadi.', 0);
   }
   if (response.status === 401 && retry && !path.startsWith('/auth/')) {
     const refreshed = await refreshAccessToken();
@@ -180,7 +177,6 @@ export const api = {
   },
   me: () => send<UserProfile>('/users/me'),
   updateProfile: (fullName: string, email: string) => send<UserProfile>('/users/me', { method: 'PATCH', body: JSON.stringify({ fullName, email }) }),
-  health: () => send<{ service: string; status: string; timestamp: string; timezone: string }>('/health'),
   listings: (query = '', page = 0, size = 50) => send<ApiPage<ListingDto>>(`/listings?query=${encodeURIComponent(query)}&page=${page}&size=${size}`),
   myListings: () => send<ListingDto[]>('/listings/my'),
   moderationQueue: (page = 0, size = 50) => send<ApiPage<ListingDto>>(`/listings/moderation?page=${page}&size=${size}`),
@@ -220,7 +216,6 @@ export const api = {
   investorReport: () => send<InvestorReportDto>('/reports/investor'),
   beekeeperReport: (from?: string, to?: string) => send<BeekeeperReportDto>(`/reports/beekeeper${from || to ? `?${new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) }).toString()}` : ''}`),
   adminDashboard: () => send<AdminDashboardDto>('/admin/dashboard'),
-  adminSystemStatus: () => send<AdminSystemStatusDto>('/admin/system/status'),
   adminUsers: (query = '', page = 0, size = 50) => send<ApiPage<AdminUserDto>>(`/admin/users?query=${encodeURIComponent(query)}&page=${page}&size=${size}`),
   updateUserRoles: (id: string, roles: string[]) => send<AdminUserDto>(`/admin/users/${id}/roles`, patchJson({ roles })),
   updateUserStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED') => send<AdminUserDto>(`/admin/users/${id}/status`, patchJson({ status })),

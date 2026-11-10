@@ -203,8 +203,8 @@ class _GuestHomeState extends State<_GuestHome> {
                 _SectionHeader(
                     title: 'Faol takliflar',
                     subtitle: snapshot.hasError
-                        ? 'API bilan bog‘lanib bo‘lmadi'
-                        : '${snapshot.data?['totalElements'] ?? 0} ta API taklifi'),
+                        ? 'Takliflar hozircha ko‘rinmadi'
+                        : '${snapshot.data?['totalElements'] ?? 0} ta taklif',
                 const SizedBox(height: 10),
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const Padding(
@@ -216,13 +216,13 @@ class _GuestHomeState extends State<_GuestHome> {
                       icon: Icons.cloud_off_outlined,
                       title: 'Takliflarni yuklab bo‘lmadi',
                       text:
-                          'API_BASE_URL va backend tarmog‘ini tekshirib, pastga tortib qayta urinib ko‘ring.')
+                          'Pastga tortib qayta urinib ko‘ring.')
                 else if (items.isEmpty)
                   const _EmptyCard(
                       icon: Icons.spa_outlined,
                       title: 'Faol taklif hozircha yo‘q',
                       text:
-                          'API’da tasdiqlangan listinglar ko‘paygach bu yerda ko‘rinadi.')
+                          'Tasdiqlangan takliflar ko‘paygach bu yerda ko‘rinadi.')
                 else
                   ...items.map((item) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -445,7 +445,6 @@ class _MobileRoleShellState extends State<_MobileRoleShell> {
   String _page = 'overview';
   Map<String, dynamic> _data = {};
   bool _loading = true;
-  String? _error;
 
   List<String> get _roles =>
       ((widget.profile['roles'] as List?) ?? const <dynamic>[])
@@ -504,7 +503,6 @@ class _MobileRoleShellState extends State<_MobileRoleShell> {
       const _PageSpec('sensors', 'Sensor qaydlari', Icons.thermostat_outlined),
       const _PageSpec('payments', 'To‘lovlar', Icons.credit_card_outlined),
       const _PageSpec('audit', 'Audit jurnali', Icons.receipt_long_outlined),
-      const _PageSpec('system', 'Tizim holati', Icons.tune_rounded)
     ];
   }
 
@@ -540,14 +538,11 @@ class _MobileRoleShellState extends State<_MobileRoleShell> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
     });
-    String? firstError;
     Future<T> safe<T>(Future<T> Function() call, T fallback) async {
       try {
         return await call();
-      } catch (error) {
-        firstError ??= error.toString();
+      } catch (_) {
         return fallback;
       }
     }
@@ -646,8 +641,6 @@ class _MobileRoleShellState extends State<_MobileRoleShell> {
               <String, dynamic>{'content': <dynamic>[]}),
           safe(() => widget.api.get('/admin/support/tickets?page=0&size=100'),
               <String, dynamic>{'content': <dynamic>[]}),
-          safe(() => widget.api.get('/admin/system/status'),
-              <String, dynamic>{}),
         ]);
         data['adminDashboard'] = asMap(admin[0]);
         data['users'] = mapList(asMap(admin[1])['content']);
@@ -656,14 +649,12 @@ class _MobileRoleShellState extends State<_MobileRoleShell> {
         data['investments'] = mapList(asMap(admin[4])['content']);
         data['auditLogs'] = mapList(asMap(admin[5])['content']);
         data['tickets'] = mapList(asMap(admin[6])['content']);
-        data['systemStatus'] = asMap(admin[7]);
       }
     }
     if (!mounted) return;
     setState(() {
       _data = data;
       _loading = false;
-      _error = firstError;
     });
   }
 
@@ -750,18 +741,8 @@ class _MobileRoleShellState extends State<_MobileRoleShell> {
                         selected: _page == page.id,
                         onTap: () => _go(page.id)))
                     .toList())),
-        const Padding(
-            padding: EdgeInsets.all(12),
-            child: Text('API: $apiBaseUrl',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Color(0xFF8B968D), fontSize: 10))),
       ]))),
       body: Column(children: [
-        if (_error != null)
-          Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: _ErrorBanner(message: _error!)),
         if (_loading)
           const LinearProgressIndicator(
               minHeight: 2, color: leaf, backgroundColor: Color(0xFFEAF1E9)),
@@ -862,8 +843,6 @@ class _MobileRoleShellState extends State<_MobileRoleShell> {
         return _SettingsPage(
             api: widget.api,
             preferences: asMap(_data['preferences']),
-            systemStatus: asMap(_data['systemStatus']),
-            showSystem: _role == 'ADMIN' || _role == 'SUPER_ADMIN',
             onChanged: _load,
             onMessage: _message);
       case 'reports':
@@ -881,14 +860,6 @@ class _MobileRoleShellState extends State<_MobileRoleShell> {
             profile: widget.profile,
             role: _role,
             onLogout: widget.onLogout,
-            onChanged: _load,
-            onMessage: _message);
-      case 'system':
-        return _SettingsPage(
-            api: widget.api,
-            preferences: asMap(_data['preferences']),
-            systemStatus: asMap(_data['systemStatus']),
-            showSystem: true,
             onChanged: _load,
             onMessage: _message);
       default:
@@ -1023,10 +994,10 @@ class _OverviewPage extends StatelessWidget {
               isUser
                   ? 'Oddiy foydalanuvchi hisobi. Investor yoki asalarichi rolini administrator vakolatli jarayon orqali tayinlaydi.'
                   : isInvestor
-                      ? 'API’da qayd etilgan buyurtmalar va xo‘jalik hisobotlari.'
+                      ? 'Buyurtmalar va xo‘jalik hisobotlari.'
                       : isKeeper
                           ? 'Xo‘jalik, ari oilalari, hosil va xarajatlarni boshqaring.'
-                          : 'Serverdagi foydalanuvchi, moderatsiya va to‘lov qaydlari.',
+                          : 'Foydalanuvchi, moderatsiya va to‘lov qaydlari.',
               style: const TextStyle(color: Color(0xFF7E8A80), height: 1.4)),
           const SizedBox(height: 16),
           if (isUser)
@@ -1052,10 +1023,10 @@ class _OverviewPage extends StatelessWidget {
                           ? 'Faol takliflar'
                           : 'Boshqaruv bo‘limlari',
               subtitle: isInvestor
-                  ? 'Serverdan olingan holatlar'
+                  ? 'Buyurtmalarim'
                   : isKeeper
                       ? '${harvests.length} ta hosil, ${expenses.length} ta xarajat'
-                      : 'Mavjud API ma’lumotlari'),
+                      : 'Mavjud ma’lumotlar'),
           const SizedBox(height: 9),
           if (isInvestor)
             ...investments.take(3).map((item) => _SimpleDataTile(
@@ -1086,8 +1057,8 @@ class _OverviewPage extends StatelessWidget {
               isKeeper && apiaries.isEmpty)
             const _EmptyCard(
                 icon: Icons.inbox_outlined,
-                title: 'API’da qayd topilmadi',
-                text: 'Ma’lumotlar backend’dan kelgach shu yerda ko‘rinadi.'),
+                title: 'Hozircha ma’lumot yo‘q',
+                text: 'Yangi qaydlar shu yerda ko‘rinadi.'),
           const SizedBox(height: 12),
           Wrap(spacing: 8, runSpacing: 8, children: [
             if (role == 'USER')
@@ -1105,11 +1076,6 @@ class _OverviewPage extends StatelessWidget {
                   onPressed: () => onNavigate('sensors'),
                   icon: const Icon(Icons.thermostat_outlined),
                   label: const Text('Sensor qaydlari')),
-            if (role == 'ADMIN' || role == 'SUPER_ADMIN')
-              OutlinedButton.icon(
-                  onPressed: () => onNavigate('system'),
-                  icon: const Icon(Icons.tune_rounded),
-                  label: const Text('Tizim holati')),
           ]),
           const SizedBox(height: 8),
         ]);
@@ -1150,7 +1116,7 @@ class _MarketplacePageState extends State<_MarketplacePage> {
         children: [
           const _SectionHeader(
               title: 'Takliflar bozori',
-              subtitle: 'API’dagi faol asalarichilik takliflari'),
+              subtitle: 'Faol asalarichilik takliflari'),
           const SizedBox(height: 10),
           TextField(
               decoration: const InputDecoration(
@@ -1167,7 +1133,7 @@ class _MarketplacePageState extends State<_MarketplacePage> {
                 icon: Icons.search_off_rounded,
                 title: 'Faol taklif topilmadi',
                 text:
-                    'API ma’lumotini, qidiruv matnini yoki tarmoqni tekshiring.'),
+                    'Qidiruv matnini tekshiring yoki qayta urinib ko‘ring.'),
           ...items.map((item) => Padding(
               padding: const EdgeInsets.only(top: 10),
               child:
@@ -1219,7 +1185,7 @@ class _ListingDetails extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _Eyebrow('FAOL API TAKLIFI'),
+              const _Eyebrow('FAOL TAKLIF'),
               const SizedBox(height: 8),
               Text(textValue(item['title'], 'Asalarichilik taklifi'),
                   style: const TextStyle(
@@ -1274,7 +1240,7 @@ class _InvestmentsPage extends StatelessWidget {
       ListView(padding: const EdgeInsets.all(16), children: [
         const _SectionHeader(
             title: 'Investitsiyalarim',
-            subtitle: 'Backend’dagi buyurtma va to‘lov holatlari'),
+            subtitle: 'Buyurtma va to‘lov holatlari'),
         const SizedBox(height: 12),
         if (investments.isEmpty)
           const _EmptyCard(
@@ -1324,7 +1290,7 @@ class _PaymentsPage extends StatelessWidget {
         _SectionHeader(
             title: admin ? 'To‘lov qaydlari' : 'To‘lovlarim',
             subtitle: admin
-                ? 'Serverda qayd etilgan to‘lov yozuvlari'
+                ? 'To‘lov yozuvlari'
                 : 'Hisobingizga bog‘langan to‘lov yozuvlari'),
         const SizedBox(height: 12),
         if (payments.isEmpty)
@@ -1334,7 +1300,7 @@ class _PaymentsPage extends StatelessWidget {
               text:
                   'Tranzaksiya yozuvlari paydo bo‘lgach shu yerda ko‘rinadi.'),
         ...payments.map((item) => _SimpleDataTile(
-            title: textValue(item['provider'], 'Provider'),
+            title: textValue(item['provider'], 'To‘lov usuli'),
             subtitle:
                 '${labelStatus(textValue(item['status'], ''))} · ${textValue(item['createdAt'], '')}',
             trailing: formatMoney(numberValue(item['amount'])))),
@@ -1360,7 +1326,7 @@ class _ApiariesPage extends StatelessWidget {
       ListView(padding: const EdgeInsets.all(16), children: [
         _SectionHeader(
             title: 'Asalarixonalar',
-            subtitle: '${apiaries.length} ta API yozuvi',
+            subtitle: '${apiaries.length} ta asalarixona',
             action: IconButton.filledTonal(
                 onPressed: () => _edit(context),
                 icon: const Icon(Icons.add_rounded))),
@@ -1581,7 +1547,7 @@ class _HarvestsPageState extends State<_HarvestsPage> {
           title: widget.admin ? 'Hosil moderatsiyasi' : 'Hosil va xarajatlar',
           subtitle: widget.admin
               ? '${pending.length} ta ko‘rib chiqilmagan hisobot'
-              : 'API’da saqlangan xo‘jalik qaydlari',
+              : 'Xo‘jalik qaydlari',
           action: widget.admin
               ? null
               : PopupMenuButton<String>(
@@ -1871,15 +1837,15 @@ class _UsersPage extends StatelessWidget {
       ListView(padding: const EdgeInsets.all(16), children: [
         _SectionHeader(
             title: 'Foydalanuvchilar',
-            subtitle: '${users.length} ta API yozuvi'),
+            subtitle: '${users.length} ta foydalanuvchi'),
         const _WarningCard(
             text:
-                'Admin rolini faqat Super Admin tayinlay oladi. Backend barcha vakolat cheklovlarini tekshiradi.'),
+                'Admin rolini faqat Super Admin tayinlay oladi. Vakolat cheklovlari har bir amal bajarilishida tekshiriladi.'),
         if (users.isEmpty)
           const _EmptyCard(
               icon: Icons.people_outline_rounded,
               title: 'Foydalanuvchi topilmadi',
-              text: 'API’dan foydalanuvchilar kelgach shu yerda ko‘rinadi.'),
+              text: 'Foydalanuvchilar mavjud bo‘lgach, shu yerda ko‘rinadi.'),
         ...users.map((user) => Card(
                 child: ListTile(
               leading: CircleAvatar(
@@ -2138,14 +2104,14 @@ class _NotificationsPage extends StatelessWidget {
       ListView(padding: const EdgeInsets.all(16), children: [
         _SectionHeader(
             title: 'Bildirishnomalar',
-            subtitle: '${notifications.length} ta server xabari',
+            subtitle: '${notifications.length} ta bildirishnoma',
             action: TextButton(
                 onPressed: _markAll, child: const Text('Barchasini o‘qildi'))),
         if (notifications.isEmpty)
           const _EmptyCard(
               icon: Icons.notifications_none_rounded,
               title: 'Bildirishnoma yo‘q',
-              text: 'Yangi xabarlar serverga kelganda shu yerda ko‘rinadi.'),
+              text: 'Yangi xabarlar shu yerda ko‘rinadi.'),
         ...notifications.map((item) => Card(
             child: ListTile(
                 leading: Icon(
@@ -2184,14 +2150,10 @@ class _SettingsPage extends StatelessWidget {
   const _SettingsPage(
       {required this.api,
       required this.preferences,
-      required this.systemStatus,
-      required this.showSystem,
       required this.onChanged,
       required this.onMessage});
   final ApiClient api;
   final Map<String, dynamic> preferences;
-  final Map<String, dynamic> systemStatus;
-  final bool showSystem;
   final Future<void> Function() onChanged;
   final void Function(String) onMessage;
   @override
@@ -2199,75 +2161,17 @@ class _SettingsPage extends StatelessWidget {
       ListView(padding: const EdgeInsets.all(16), children: [
         const _SectionHeader(
             title: 'Bildirishnoma sozlamalari',
-            subtitle: 'Tanlovlar hisobingiz uchun API’da saqlanadi.'),
+            subtitle: 'O‘zingizga kerakli yangilanishlarni tanlang.'),
         ...[
           ('investmentUpdates', 'Buyurtma yangiliklari'),
           ('reportUpdates', 'Hosil va xarajat xabarlari'),
           ('marketingUpdates', 'Platforma e’lonlari'),
-          ('pushEnabled', 'Push yuborishga ruxsat'),
+          ('pushEnabled', 'Push bildirishnomalar'),
         ].map((item) => SwitchListTile(
             title: Text(item.$2),
             value: preferences[item.$1] == true,
             onChanged: (value) => _save(item.$1, value),
             contentPadding: EdgeInsets.zero)),
-        const _WarningCard(
-            text:
-                'Push, SMS yoki payment provider ulanmagan bo‘lsa, sozlamani yoqish tashqi xabar yuborilishini anglatmaydi.'),
-        if (showSystem) ...[
-          const SizedBox(height: 18),
-          const _SectionHeader(
-              title: 'Tizim va integratsiyalar',
-              subtitle: 'Maxfiy credential qiymatlari ko‘rsatilmaydi.'),
-          _SimpleDataTile(
-              title: 'Demo rejimi',
-              subtitle: systemStatus['demoMode'] == true
-                  ? 'Yoqilgan — production uchun mos emas'
-                  : 'O‘chirilgan',
-              trailing: systemStatus['demoMode'] == true ? 'TEKSHIRING' : 'OK'),
-          _SimpleDataTile(
-              title: 'OTP kodi javobda',
-              subtitle: systemStatus['otpCodeExposureEnabled'] == true
-                  ? 'Yoqilgan — local sinov uchun'
-                  : 'O‘chirilgan',
-              trailing: systemStatus['otpCodeExposureEnabled'] == true
-                  ? 'TEKSHIRING'
-                  : 'OK'),
-          _SimpleDataTile(
-              title: 'SMS provider',
-              subtitle:
-                  '${systemStatus['smsProvider'] ?? 'noma’lum'} · ${systemStatus['smsConfigured'] == true ? 'sozlangan' : 'ulanmagan'}',
-              trailing: 'ENV'),
-          _SimpleDataTile(
-              title: 'Investitsiya shartlari',
-              subtitle: systemStatus['investmentTermsConfigured'] == true
-                  ? 'Versiya belgilangan'
-                  : 'Tasdiqlanmagan',
-              trailing: systemStatus['investmentTermsConfigured'] == true
-                  ? 'OK'
-                  : 'O‘CHIQ'),
-          _SimpleDataTile(
-              title: 'Haqiqiy to‘lov',
-              subtitle:
-                  (systemStatus['configuredPaymentProviders'] as List? ?? [])
-                      .join(', '),
-              trailing: systemStatus['paymentsEnabled'] == true
-                  ? 'YOQILGAN'
-                  : 'O‘CHIQ'),
-          _SimpleDataTile(
-              title: 'Super Admin bootstrap',
-              subtitle: 'Telefon raqam ko‘rsatilmaydi',
-              trailing: systemStatus['bootstrapAdminConfigured'] == true
-                  ? 'SOZLANGAN'
-                  : 'YO‘Q'),
-          const _SimpleDataTile(
-              title: 'Push / avtomatik IoT',
-              subtitle:
-                  'Provider/device ulanmagan; qo‘lda sensor qaydi mumkin.',
-              trailing: 'YO‘Q'),
-          const _WarningCard(
-              text:
-                  'Tizim secret’lari server environment/secret manager’da o‘zgartiriladi. Bu ekran faqat xavfsiz readiness holatini ko‘rsatadi.'),
-        ],
       ]);
   Future<void> _save(String key, bool value) async {
     final body = {
@@ -2298,7 +2202,7 @@ class _ReportsPage extends StatelessWidget {
       ListView(padding: const EdgeInsets.all(16), children: [
         const _SectionHeader(
             title: 'Hisobotlar',
-            subtitle: 'Serverdan olingan jamlanma ma’lumotlar'),
+            subtitle: 'Jamlanma ma’lumotlar'),
         _SimpleDataTile(
             title: role == 'INVESTOR'
                 ? 'Faol buyurtmalar qiymati'
@@ -2331,7 +2235,7 @@ class _AuditPage extends StatelessWidget {
       ListView(padding: const EdgeInsets.all(16), children: [
         const _SectionHeader(
             title: 'Audit jurnali',
-            subtitle: 'Backend’da qayd etilgan admin amallari'),
+            subtitle: 'Administrator amallari tarixi'),
         if (rows.isEmpty)
           const _EmptyCard(
               icon: Icons.receipt_long_outlined,
@@ -2381,7 +2285,7 @@ class _ProfilePageState extends State<_ProfilePage> {
         children: [
           const _SectionHeader(
               title: 'Profil',
-              subtitle: 'Serverda saqlangan hisob ma’lumotlari'),
+              subtitle: 'Hisob ma’lumotlari'),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -2428,7 +2332,7 @@ class _ProfilePageState extends State<_ProfilePage> {
                       trailing: textValue(widget.profile['phone'], '—')),
                   _SimpleDataTile(
                       title: 'Hisob holati',
-                      subtitle: 'Backend’dagi status',
+                      subtitle: 'Hisob holati',
                       trailing: labelStatus(
                           textValue(widget.profile['accountStatus'], ''))),
                   _SimpleDataTile(
