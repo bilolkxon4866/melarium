@@ -43,7 +43,7 @@ Payment gateway hamda investitsiyaning huquqiy va daromad shartlari production u
 
 ## Hozircha bajarilmagan qadam
 
-Bu ish muhitida Railway connector ishlamaydi; Railway CLI, token yoki Railway project ma’lumoti ham sozlanmagan. Shu sababli Docker deploy tayyorgarligini qo‘shish mumkin, ammo Railway project yaratish, secrets kiritish va real deploy/domain’ni tekshirish hali bajarilmadi. Buning uchun Railway account egasi dashboard’da project va secrets’ni sozlashi yoki project-scoped Railway access’ni bu runtime’ga xavfsiz ulashi kerak.
+Bu ish muhitida Railway connector, CLI, token yoki Railway project ma’lumoti mavjud emas. Root Dockerfile GitHub Actions’da muvaffaqiyatli build qilindi, ammo Railway project yaratish, secrets sozlash va live deploy/domain’ni tekshirish hali bajarilmadi. Buni tugatish uchun Railway account egasi dashboard’da project va secrets’ni sozlashi yoki project-scoped Railway access’ni bu runtime’ga xavfsiz ulashi kerak.
 
 ## Rasmiy hujjatlar
 
