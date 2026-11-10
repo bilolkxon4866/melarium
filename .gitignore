@@ -44,3 +44,4 @@ mobile/ios/Runner/GeneratedPluginRegistrant.*
 .DS_Store
 .idea/
 .vscode/
+.vercel

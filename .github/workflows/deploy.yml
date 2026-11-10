@@ -1,0 +1,52 @@
+name: Deploy backend
+
+# Every push to main rebuilds the Spring Boot JAR (with the web frontend bundled)
+# and installs it on the Oracle Cloud server. The server-side script
+# /usr/local/bin/melarium-deploy restarts the service and rolls back
+# automatically if the health check fails.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Bundle frontend into backend
+        run: |
+          mkdir -p backend/src/main/resources/static
+          cp -r frontend/dist/. backend/src/main/resources/static/
+      - run: mvn -B -f backend/pom.xml -DskipTests package
+
+      - name: Upload JAR and restart
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          JAR=$(ls backend/target/melarium-api-*.jar | grep -v original | head -1)
+          scp -i ~/.ssh/deploy_key "$JAR" "$USER@$HOST:/home/deploy/app.jar"
+          ssh -i ~/.ssh/deploy_key "$USER@$HOST" 'sudo /usr/local/bin/melarium-deploy'
