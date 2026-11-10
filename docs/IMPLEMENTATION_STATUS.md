@@ -14,6 +14,7 @@ Oxirgi yangilanish: **2026-11-04**
 - [x] Uzbek Latin UI matnlari tekshirildi; tekshirilgan source va README fayllarida kirill belgisi topilmadi.
 - [x] Android arm64 debug APK build qilindi. Ilova nomi `MELARIUM`.
 - [x] Loyiha manba kodi GitHub’dagi `bilolkxon4866/melarium` reposining `main` branch’iga push qilindi (boshlang‘ich commit: `89ace5c`).
+- [x] Railway uchun root multi-stage Dockerfile, frontend/API’ni bir origin’da berish sozlamasi va Railway/PostgreSQL yo‘riqnomasi qo‘shildi; live deploy bajarilgan degani emas.
 
 ## Tekshiruv natijalari
 
@@ -31,7 +32,8 @@ Oxirgi yangilanish: **2026-11-04**
 - [ ] Release APK signing, production HTTPS API domeni va haqiqiy qurilmada API ulanishini sozlash.
 - [ ] SMS, push, payment gateway/webhook va IoT qurilmalarining haqiqiy integratsiyasi: provider credentials va shartnomalar berilmagani uchun haqiqiy oqimlar yoqilmagan.
 - [ ] Investitsiyaning huquqiy modeli, ROI/daromad, xavf, refund va KYC shartlarini loyiha egasi tasdiqlashi kerak. Tasdiqlanmaguncha daromad kafolatlanmaydi va real pul oqimi yoqilmaydi.
-- [ ] Haqiqiy browser/device UAT, production deploy, monitoring va backup rejasi.
+- [ ] Railway’da project yaratish va deploy: bu ish muhitida Railway CLI/token yo‘q; account access, PostgreSQL service va haqiqiy SMS credentials sozlanishi kerak. Docker image build yoki live domain hali tekshirilmagan.
+- [ ] Haqiqiy browser/device UAT, monitoring va backup rejasi.
 
 
 ## Yetkazib berish fayllari

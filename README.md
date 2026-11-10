@@ -102,6 +102,10 @@ cd mobile && flutter analyze && flutter test
 
 Backend testlar o‘tdi; lokal PostgreSQL 17.11 da Flyway V1–V5 migratsiyalari qo‘llanib, Hibernate schema tekshiruvi muvaffaqiyatli yakunlandi. Ishlatilgan Flyway versiyasi PostgreSQL 17 uchun moslik ogohlantirishini beradi (rasmiy tekshirilgan eng so‘nggi major versiya 16); production’da tanlangan PostgreSQL/Flyway versiyalarini alohida tekshiring. Haqiqiy SMS, payment webhook va iOS release oqimlari credentials hamda tegishli build muhitida alohida tasdiqlanishi kerak.
 
+## Railway joylash
+
+Root `Dockerfile` web frontend va Spring Boot API’ni bitta Railway service’da ishga tushirish uchun tayyorlandi; kerakli Railway va PostgreSQL variable’lari `docs/RAILWAY_DEPLOY.md` da berilgan. Bu sozlama live deploy qilindi degani emas: Railway project/access, PostgreSQL service va haqiqiy SMS credentials kerak. Ular sozlanmaguncha ilova production-ready deb hisoblanmaydi.
+
 ## Hali egasi tasdiqlashi shart bo‘lganlar
 
 Quyidagi ishlarni texnik taxmin bilan yoqib bo‘lmaydi: investitsiya va ari oilasiga egalik/ulushning huquqiy modeli; ROI, daromad formulasi yoki kafolat; komissiya va daromad taqsimoti; kasallik/yo‘qotish/force majeure xavfini kim o‘z zimmasiga olishi; muddatidan oldin chiqish/refund; KYC va moderatsiya siyosati; foydalanuvchi shartnomasi, privacy/consent; Click/Payme/Uzcard/Humo merchant contract; SMS/push credentials; IoT device protokoli va secret; operator aloqa ma’lumoti; hosting/backup va production domen. Bular tasdiqlanmaguncha haqiqiy pul olish, daromadni va’da qilish yoki sensor ma’lumotini avtomatik/verified deb atash mumkin emas.

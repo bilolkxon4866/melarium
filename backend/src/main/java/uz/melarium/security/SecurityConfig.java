@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, exception) -> writeError(response, HttpStatus.FORBIDDEN, "Bu amal uchun ruxsat yo‘q")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/", "/index.html", "/assets/**", "/apiary.jpg", "/favicon.ico").permitAll()
                         .requestMatchers("/api/v1/health", "/api/v1/auth/**", "/api/v1/listings/**", "/api/v1/payments/webhook/**", "/api-docs/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
