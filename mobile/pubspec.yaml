@@ -1,0 +1,29 @@
+name: melarium_mobile
+description: MELARIUM asalarichilik platformasi uchun mobil ilova prototipi.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  http: ^1.5.0
+  flutter_secure_storage: ^9.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+dependency_overrides:
+  # path_provider_android 2.3.x builds JNI/CMake native targets; 2.2.23
+  # preserves the platform-channel implementation needed by this app while
+  # keeping debug builds lightweight across constrained Android builders.
+  path_provider_android: 2.2.23
+
+flutter:
+  uses-material-design: true

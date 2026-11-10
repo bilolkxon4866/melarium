@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: MELARIUM API
+  version: 0.1.0
+  description: |
+    MELARIUM REST API boshlang‘ich kontrakti. API JSON formatida ishlaydi va /api/v1 orqali versiyalanadi.
+    Autentifikatsiya va moliyaviy endpointlar hozircha ishlab chiqilmoqda; demo ma’lumotlar haqiqiy tranzaksiya yoki daromadni bildirmaydi.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+paths:
+  /health:
+    get:
+      summary: API holati
+      responses:
+        '200':
+          description: Xizmat ishlayapti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service: { type: string, example: melarium-api }
+                  status: { type: string, example: UP }
+                  timestamp: { type: string, format: date-time }
+                  timezone: { type: string, example: Asia/Tashkent }
+  /listings:
+    get:
+      summary: Faol takliflarni sahifalab olish
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 12 }
+      responses:
+        '200':
+          description: Faol takliflar sahifasi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageOfListings'
+  /listings/{id}:
+    get:
+      summary: Faol taklif tafsiloti
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Taklif tafsiloti
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        '404': { description: Taklif topilmadi }
+components:
+  schemas:
+    Listing:
+      type: object
+      required: [id, title, description, category, status, location, currency, unitPrice, unitsTotal, unitsAvailable]
+      properties:
+        id: { type: string, format: uuid }
+        beekeeperId: { type: string, format: uuid }
+        apiaryId: { type: string, format: uuid }
+        title: { type: string, maxLength: 180 }
+        description: { type: string }
+        category: { type: string, example: COLONY }
+        status: { type: string, enum: [active] }
+        location: { type: string }
+        currency: { type: string, example: UZS }
+        unitPrice: { type: number, format: decimal }
+        unitsTotal: { type: integer }
+        unitsAvailable: { type: integer }
+        createdAt: { type: string, format: date-time }
+    PageOfListings:
+      type: object
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/Listing' }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        number: { type: integer }
+        size: { type: integer }

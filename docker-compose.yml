@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: melarium-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: melarium
+      POSTGRES_USER: melarium
+      POSTGRES_PASSWORD: melarium_dev_password
+      TZ: Asia/Tashkent
+    ports:
+      - "5432:5432"
+    volumes:
+      - melarium-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U melarium -d melarium"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  melarium-postgres-data:
