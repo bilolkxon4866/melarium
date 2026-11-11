@@ -58,7 +58,7 @@ public class ListingService {
     @Transactional
     public ListingResponse create(ListingCreateRequest body, AuthenticatedUser actor) {
         Apiary apiary = apiaryAccessService.requireAccess(body.apiaryId(), actor);
-        if (!"ACTIVE".equals(apiary.getStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "Faol бус asalarixonada taklif yaratib bo‘lmaydi");
+        if (!"ACTIVE".equals(apiary.getStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "Faol bo‘lmagan asalarixonada taklif yaratib bo‘lmaydi");
         MarketplaceListing listing = MarketplaceListing.create(actor.id(), apiary.getId(), body.title(), body.description(), "COLONY", body.location(), body.unitPrice(), body.unitsTotal());
         MarketplaceListing saved = listingRepository.save(listing);
         auditService.record(actor.id(), "LISTING_SUBMITTED", "LISTING", saved.getId(), "SUCCESS", java.util.Map.of("status", "MODERATION"));

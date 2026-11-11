@@ -8,7 +8,7 @@
 ## O‘zgartirish kiritishda qoidalar
 
 - `vercel.json` va `.github/workflows/deploy.yml` fayllarini o‘chirmang va API proxy manzilini o‘zgartirmang.
-- Mavjud Flyway migratsiyalarini (`backend/src/main/resources/db/migration/V1__…`–`V5__…`) **tahrirlamang**. Schema o‘zgarishi uchun yangi fayl qo‘shing: `V6__tavsif.sql`, `V7__…` va hokazo. Aks holda server ishga tushmaydi.
+- Mavjud Flyway migratsiyalarini (`backend/src/main/resources/db/migration/V1__…`–`V7__…`) **tahrirlamang**. Schema o‘zgarishi uchun keyingi versiya raqami bilan yangi fayl qo‘shing. Aks holda server ishga tushmaydi.
 - Hibernate `validate` rejimida ishlaydi: entity'ga yangi ustun qo‘shilsa, unga mos migratsiya ham bo‘lishi shart.
 - Maxfiy qiymatlar (DB paroli, JWT secret va h.k.) serverda saqlanadi. Ularni repo'ga commit qilmang.
 - Server kichik (1 GB RAM): og‘ir kutubxonalar qo‘shishdan saqlaning.

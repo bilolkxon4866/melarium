@@ -41,6 +41,10 @@ public class UserController {
     @Transactional
     public UserProfileResponse updateMe(@AuthenticationPrincipal AuthenticatedUser principal, @Valid @RequestBody UpdateProfileRequest body) {
         UserAccount user = getUser(principal);
+        String normalizedEmail = UserAccount.normalizeEmail(body.email());
+        if (normalizedEmail != null && userRepository.existsByEmailIgnoreCaseAndIdNot(normalizedEmail, user.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Bu email boshqa hisobda ishlatilgan");
+        }
         user.updateProfile(body.fullName(), body.email(), body.profileImageData());
         user = userRepository.save(user);
         auditService.record(user.getId(), "USER_PROFILE_UPDATED", "USER", user.getId(), "SUCCESS", java.util.Map.of());

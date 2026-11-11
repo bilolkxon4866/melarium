@@ -43,6 +43,28 @@ public class UserRoleService {
     }
 
     @Transactional
+    public void syncAuthenticationRoles(UUID userId, String requiredRole) {
+        if (!List.of("USER", "ADMIN", "SUPER_ADMIN").contains(requiredRole)) {
+            throw new IllegalArgumentException("Noma’lum auth roli: " + requiredRole);
+        }
+        jdbcTemplate.update("""
+                delete from user_roles ur
+                using roles r
+                where ur.role_id = r.id
+                  and ur.user_id = ?
+                  and r.code in ('ADMIN', 'SUPER_ADMIN')
+                  and ur.assigned_by is null
+                """, userId);
+
+        if ("SUPER_ADMIN".equals(requiredRole)) {
+            assignIfAbsent(userId, "ADMIN", null);
+            assignIfAbsent(userId, "SUPER_ADMIN", null);
+        } else {
+            assignIfAbsent(userId, requiredRole, null);
+        }
+    }
+
+    @Transactional
     public void replaceRoles(UUID userId, List<String> roleCodes, UUID assignedBy) {
         List<String> safeRoles = roleCodes.stream().distinct().toList();
         if (safeRoles.isEmpty()) throw new IllegalArgumentException("Kamida bitta rol kerak");

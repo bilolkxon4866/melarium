@@ -52,14 +52,14 @@ class ApiClient {
     await _storage.delete(key: 'melarium.refresh');
   }
 
-  Future<Map<String, dynamic>> requestOtp(String phone) async {
+  Future<Map<String, dynamic>> requestOtp(String phone, String email) async {
     return await _sendJson('POST', '/auth/otp/request',
-        body: {'phone': phone}, authenticated: false) as Map<String, dynamic>;
+        body: {'phone': phone, 'email': email}, authenticated: false) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
+  Future<Map<String, dynamic>> verifyOtp(String phone, String email, String code) async {
     final response = await _sendJson('POST', '/auth/otp/verify',
-        body: {'phone': phone, 'code': code},
+        body: {'phone': phone, 'email': email, 'code': code},
         authenticated: false) as Map<String, dynamic>;
     await _saveSession(response);
     return response;

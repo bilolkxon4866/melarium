@@ -170,8 +170,8 @@ const json = (value: unknown): RequestInit => ({ method: 'POST', body: JSON.stri
 const patchJson = (value: unknown): RequestInit => ({ method: 'PATCH', body: JSON.stringify(value) });
 
 export const api = {
-  requestOtp: (phone: string) => send<OtpRequestResponse>('/auth/otp/request', json({ phone })),
-  verifyOtp: (phone: string, code: string) => send<SessionTokens>('/auth/otp/verify', json({ phone, code })),
+  requestOtp: (phone: string, email: string) => send<OtpRequestResponse>('/auth/otp/request', json({ phone, email })),
+  verifyOtp: (phone: string, email: string, code: string) => send<SessionTokens>('/auth/otp/verify', json({ phone, email, code })),
   async logout() {
     if (refreshToken) { try { await send<void>('/auth/logout', json({ refreshToken }), false); } finally { clearSession(); } }
     else clearSession();

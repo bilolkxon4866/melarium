@@ -26,13 +26,13 @@ public class AuthController {
 
     @PostMapping("/otp/request")
     public ResponseEntity<OtpRequestResponse> requestOtp(@Valid @RequestBody OtpRequest body, HttpServletRequest request) {
-        OtpRequestResponse response = authService.requestOtp(body.phone(), request.getRemoteAddr());
+        OtpRequestResponse response = authService.requestOtp(body.phone(), body.email(), request.getRemoteAddr());
         return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).body(response);
     }
 
     @PostMapping("/otp/verify")
     public ResponseEntity<TokenResponse> verifyOtp(@Valid @RequestBody OtpVerifyRequest body) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(authService.verifyOtp(body.phone(), body.code()));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(authService.verifyOtp(body.phone(), body.email(), body.code()));
     }
 
     @PostMapping("/token/refresh")

@@ -3,8 +3,9 @@ info:
   title: MELARIUM API
   version: 0.1.0
   description: |
-    MELARIUM REST API boshlang‘ich kontrakti. API JSON formatida ishlaydi va /api/v1 orqali versiyalanadi.
-    Autentifikatsiya va moliyaviy endpointlar hozircha ishlab chiqilmoqda; demo ma’lumotlar haqiqiy tranzaksiya yoki daromadni bildirmaydi.
+    MELARIUM REST API kontrakti. API JSON formatida ishlaydi va /api/v1 orqali versiyalanadi.
+    OTP autentifikatsiyasida email va telefon juftligi kiritiladi, tasdiqlash kodi SMS orqali telefonga yuboriladi.
+    Moliyaviy endpointlar demo holatida; ma’lumotlar haqiqiy tranzaksiya yoki daromadni bildirmaydi.
 servers:
   - url: http://localhost:8080/api/v1
     description: Local development
@@ -24,6 +25,39 @@ paths:
                   status: { type: string, example: UP }
                   timestamp: { type: string, format: date-time }
                   timezone: { type: string, example: Asia/Tashkent }
+  /auth/otp/request:
+    post:
+      summary: Email va telefon bilan OTP so‘rash
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpRequest' }
+      responses:
+        '202':
+          description: OTP SMS orqali yuborildi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OtpRequestResponse' }
+        '400': { description: Kiritilgan email yoki telefon noto‘g‘ri }
+        '429': { description: OTP so‘rov limiti tugadi }
+  /auth/otp/verify:
+    post:
+      summary: OTP kodi bilan telefonni tasdiqlash va tizimga kirish
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpVerifyRequest' }
+      responses:
+        '200':
+          description: Sessiya tokenlari
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { description: Email OTP so‘rovidagi email bilan mos emas }
+        '401': { description: OTP kodi noto‘g‘ri yoki yaroqsiz }
+        '409': { description: Email boshqa hisobda ishlatilgan }
   /listings:
     get:
       summary: Faol takliflarni sahifalab olish
@@ -62,6 +96,43 @@ paths:
         '404': { description: Taklif topilmadi }
 components:
   schemas:
+    OtpRequest:
+      type: object
+      required: [phone, email]
+      properties:
+        phone: { type: string, maxLength: 30, example: '+998901234567' }
+        email: { type: string, format: email, maxLength: 255, example: user@example.com }
+    OtpVerifyRequest:
+      type: object
+      required: [phone, email, code]
+      properties:
+        phone: { type: string, maxLength: 30, example: '+998901234567' }
+        email: { type: string, format: email, maxLength: 255, example: user@example.com }
+        code: { type: string, pattern: '^[0-9]{6}$', example: '123456' }
+    OtpRequestResponse:
+      type: object
+      properties:
+        phone: { type: string }
+        expiresInSeconds: { type: integer, format: int64 }
+        deliveryMode: { type: string, example: SMS }
+        debugCode: { type: string, nullable: true }
+    TokenResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+        expiresInSeconds: { type: integer, format: int64 }
+        user: { $ref: '#/components/schemas/AuthenticatedUser' }
+    AuthenticatedUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        phone: { type: string }
+        fullName: { type: string, nullable: true }
+        roles:
+          type: array
+          items: { type: string }
     Listing:
       type: object
       required: [id, title, description, category, status, location, currency, unitPrice, unitsTotal, unitsAvailable]

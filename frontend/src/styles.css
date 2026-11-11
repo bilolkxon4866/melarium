@@ -764,6 +764,9 @@ img { display: block; max-width: 100%; }
 .auth-form > p { margin: 0 0 22px; color: #87948a; font-size: 10px; line-height: 1.55; }
 .auth-form > p strong { color: #49624d; font-weight: 700; }
 .auth-form > label { margin-bottom: 7px; color: #5b6e60; font-size: 9px; font-weight: 700; }
+.auth-email-input { width: 100%; height: 43px; margin-bottom: 12px; padding: 0 11px; border: 1px solid #e2e9e1; border-radius: 8px; outline: 0; color: #425a48; background: #fff; font-size: 11px; }
+.auth-email-input:focus { border-color: #8eb295; box-shadow: 0 0 0 3px rgba(73, 128, 82, .08); }
+.auth-email-input::placeholder { color: #b1bab1; }
 .auth-phone-field { height: 43px; display: flex; align-items: center; gap: 9px; padding: 0 11px; border: 1px solid #e2e9e1; border-radius: 8px; color: #4d6d52; background: #fff; }
 .auth-phone-field:focus-within { border-color: #8eb295; box-shadow: 0 0 0 3px rgba(73, 128, 82, .08); }
 .auth-phone-field > span { padding-right: 9px; border-right: 1px solid #e4ebe3; color: #557457; font-size: 10px; font-weight: 700; }

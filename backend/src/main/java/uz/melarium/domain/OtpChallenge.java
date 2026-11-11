@@ -18,6 +18,9 @@ public class OtpChallenge {
     @Column(nullable = false, length = 20)
     private String phone;
 
+    @Column(name = "email_hash", length = 64)
+    private String emailHash;
+
     @Column(name = "code_hash", nullable = false, length = 64)
     private String codeHash;
 
@@ -38,10 +41,11 @@ public class OtpChallenge {
 
     protected OtpChallenge() { }
 
-    public static OtpChallenge create(String phone, String codeHash, Instant expiresAt, String requestIp) {
+    public static OtpChallenge create(String phone, String emailHash, String codeHash, Instant expiresAt, String requestIp) {
         OtpChallenge challenge = new OtpChallenge();
         challenge.id = UUID.randomUUID();
         challenge.phone = phone;
+        challenge.emailHash = emailHash;
         challenge.codeHash = codeHash;
         challenge.expiresAt = expiresAt;
         challenge.requestIp = requestIp;
@@ -55,6 +59,7 @@ public class OtpChallenge {
     public UUID getId() { return id; }
     public Instant getCreatedAt() { return createdAt; }
     public String getPhone() { return phone; }
+    public String getEmailHash() { return emailHash; }
     public String getCodeHash() { return codeHash; }
 
     @PrePersist

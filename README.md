@@ -2,7 +2,7 @@
 
 MELARIUM — asalarichilik xo‘jaliklari, investorlar va administratorlar uchun web va mobil platforma. Ushbu monorepo MELARIUM texnik topshirig‘i asosida MVP sifatida ishlab chiqilmoqda.
 
-> **Holat:** web/backend oqimlari va Flutter API clienti mavjud. `flutter analyze`, `flutter test` (2 test) hamda backend testlar (4 test) o‘tdi; Android arm64 debug APK muvaffaqiyatli yig‘ildi; universal/multi-ABI APK bu xotira cheklangan muhitda tekshirilmagan. Flyway V1–V5 migratsiyalari PostgreSQL 17.11 ga smoke-test orqali qo‘llanib, Hibernate `validate` muvaffaqiyatli ishladi. iOS build Linux’da tekshirilmagan; buning uchun macOS/Xcode kerak. Bu MVP ishlab chiqarish muhiti uchun tayyor platforma deb hisoblanmaydi. SMS, push, to‘lov provayderi va haqiqiy IoT sensor integratsiyalari credentials hamda loyiha egasining tasdig‘ini kutmoqda.
+> **Holat:** auth endi email+telefonni so‘raydi, telefon OTP’sini saqlab qoladi va rollarni serverdagi juftliklardan belgilaydi. Joriy tekshiruvda web `npm run typecheck`/`npm run build` va backend `mvn -f backend/pom.xml test` (9 ta test) muvaffaqiyatli. Flyway V1–V7 migratsiyasi PostgreSQL 17.11’da sun’iy duplicate email ma’lumotlari bilan smoke-test qilindi; Hibernate `validate` ham startup’da o‘tdi. Flyway PostgreSQL 17.11 uchun moslik ogohlantirishi chiqardi; production ma’lumotlar nusxasida alohida tekshiruv talab etiladi. Flutter/Dart SDK bu muhitda yo‘q, shuning uchun yangi mobile auth o‘zgarishi `flutter analyze`/`flutter test` bilan tekshirilmagan; Android arm64 APK oldingi source’dan tuzilgan. iOS build Linux’da tekshirilmagan; buning uchun macOS/Xcode kerak. Bu MVP ishlab chiqarish muhiti uchun tayyor platforma deb hisoblanmaydi. SMS, push, to‘lov provayderi va haqiqiy IoT sensor integratsiyalari credentials hamda loyiha egasining tasdig‘ini kutmoqda.
 
 ## Tuzilma
 
@@ -32,15 +32,28 @@ Backend odatda `http://localhost:8080` da ishga tushadi. Flyway schema migratsiy
 
 Lokal profil OTP’ni development usulida chiqarishi mumkin. Bu rejim faqat lokal sinov uchun: production’da `AUTH_EXPOSE_OTP=false` bo‘lishi, `SMS_PROVIDER` esa tasdiqlangan SMS gateway va credential’lar bilan sozlanishi kerak.
 
-### 2) Super Admin bootstrap
+### 2) Admin va Super Admin roli juftliklari
 
-Dastlabki Super Admin raqamini maxfiy konfiguratsiyada `APP_SECURITY_BOOTSTRAP_ADMIN_PHONE` orqali belgilang. Shu raqamning OTP’si muvaffaqiyatli tasdiqlanganda hisobga `SUPER_ADMIN` roli beriladi. Boshqa yangi foydalanuvchilar odatiy `USER` (oddiy foydalanuvchi) roli bilan ochiladi; investor yoki asalarichi rollarini vakolatli administrator tayinlaydi. Bootstrap raqamiga tegishli telefon/SMS xizmati loyiha egasi tomonidan xavfsiz saqlanishi shart.
+Ro‘yxatdan o‘tish va kirishda email hamda O‘zbekiston telefon raqami kiritiladi; tasdiqlash OTP kodi hanuz SMS orqali faqat telefonga yuboriladi. Backend emailni OTP so‘roviga bog‘laydi, tekshirilgan raqamdagi hisobga muvaffaqiyatli OTP tasdiqlangach emailni saqlaydi. Email alohida OTP bilan tasdiqlanmaydi.
 
-Misol (faqat lokal shell):
+Imtiyozli rol mijoz tanlovidan emas, backend muhitidagi **email + telefonning ikkalasi ham** aniq mos kelishidan kelib chiqadi:
+
+- Boshqa yangi kombinatsiya — `USER`.
+- `APP_SECURITY_ADMIN_EMAIL` + `APP_SECURITY_ADMIN_PHONE` — `ADMIN`.
+- `APP_SECURITY_SUPER_ADMIN_EMAIL` + `APP_SECURITY_SUPER_ADMIN_PHONE` — `ADMIN` va `SUPER_ADMIN`.
+
+Juftlikning faqat bitta qiymatini berish backend’ni ishga tushirishda xato beradi. Lokal testda qiymatlarni shell’da bering:
 
 ```bash
-export APP_SECURITY_BOOTSTRAP_ADMIN_PHONE=+998901234567
+export APP_SECURITY_ADMIN_EMAIL='admin@example.com'
+export APP_SECURITY_ADMIN_PHONE='+998901234567'
+export APP_SECURITY_SUPER_ADMIN_EMAIL='superadmin@example.com'
+export APP_SECURITY_SUPER_ADMIN_PHONE='+998907654321'
 ```
+
+Production’da qiymatlarni Spring Boot backend ishlayotgan muhitning **server-side environment/secrets** sozlamasiga kiriting. Joriy deploy’da backend serverda ishlaydi; faqat Vercel frontend loyihasiga qo‘shilgan qiymatlar backend’ga avtomatik o‘tmaydi. Backend’ni Vercel Container Runtime’ga ko‘chirgan taqdirdagina Vercel Project → Settings → Environment Variables’da Production/Preview’ni tanlab kiriting va redeploy qiling. `VITE_` prefiksini qo‘ymang. Email va telefonlarni chatga yoki Git’ga yubormang. Eski `APP_SECURITY_BOOTSTRAP_ADMIN_PHONE` phone-only bootstrap endi ishlatilmaydi.
+
+Mavjud emaili bo‘lmagan eski foydalanuvchilar telefon OTP’sini qayta tasdiqlagach kiritgan emaili hisobga biriktiriladi. V7 migration email’larni kichik harfga normallashtiradi va case-insensitive uniqueness o‘rnatadi; avvaldan takrorlangan emaillarda eng eski hisobda qiymat qoladi, qolganlari `NULL` qilinadi. Eski phone-only bootstrap’dan kelgan system `ADMIN`/`SUPER_ADMIN` grantlari mavjud DB’da saqlandi, lekin yangi backend’dagi ilk muvaffaqiyatli OTP loginida email+telefon juftligiga ko‘ra qayta tekshiriladi. **Production deploydan oldin yangi Admin va Super Admin juftliklarini backend environment’ga sozlang**; to‘liq pair’lar bo‘lmasa production backend ataylab ishga tushmaydi. Investor yoki asalarichi rollarini vakolatli administrator tayinlaydi.
 
 ### 3) Web
 
@@ -77,9 +90,9 @@ Android emulator uchun standart API URL `http://10.0.2.2:8080/api/v1`; `localhos
 ## Xavfsizlik va konfiguratsiya
 
 - JWT access token qisqa muddatli, refresh token aylantiriladi va qayta ishlatilgan token bekor qilinadi.
-- Server role’lari: `USER`, `INVESTOR`, `BEEKEEPER`, `ADMIN`, `SUPER_ADMIN`; yangi hisoblar `USER` bo‘lib ochiladi, boshqa rollarni vakolatli administrator tayinlaydi. Admin endpointlari backend’da tekshiriladi.
-- Development JWT secret, OTP pepper va DB paroli default qiymatlari **faqat lokal muhit** uchun. Production’da `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET_BASE64`, `OTP_PEPPER_BASE64`, CORS origin va boshqa maxfiy qiymatlarni secret manager/environment orqali belgilang.
-- Birinchi real Adminni `APP_SECURITY_BOOTSTRAP_ADMIN_PHONE` bilan xavfsiz bootstrap qiling; oddiy administrator Super Admin rolini bera olmaydi.
+- Server role’lari: `USER`, `INVESTOR`, `BEEKEEPER`, `ADMIN`, `SUPER_ADMIN`. Auth orqali `USER`/`ADMIN`/`SUPER_ADMIN` rollari serverdagi email+telefon juftligi bilan belgilanadi; Super Admin `ADMIN` huquqini ham oladi. Investor va asalarichi rollarini vakolatli administrator tayinlaydi.
+- Development JWT secret, OTP pepper va DB paroli default qiymatlari **faqat lokal muhit** uchun. Production’da `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET_BASE64`, `OTP_PEPPER_BASE64`, `SMS_API_URL`, `SMS_API_TOKEN`, `SMS_SENDER_ID` va to‘rtta `APP_SECURITY_*_EMAIL/PHONE` qiymatini server-side secret manager/environment orqali belgilang. Qiymatlarni qanday olish va qo‘shish bo‘yicha `docs/VERCEL_DEPLOY.md` ni ko‘ring.
+- Production backend ikkala to‘liq Admin va Super Admin juftligini talab qiladi. Eski `APP_SECURITY_BOOTSTRAP_ADMIN_PHONE` endi rol bermaydi; oddiy administrator Super Admin rolini tayinlay olmaydi.
 - API’da validatsiya, resurs egasi tekshiruvi va sezgir amallar uchun audit yozuvlari mavjud. Ishga tushirishdan oldin deployment, logging, backup va rate-limit siyosatlari alohida ko‘rib chiqilishi kerak.
 
 ## Mavjud asosiy oqimlar
@@ -100,11 +113,11 @@ mvn -f backend/pom.xml test
 cd mobile && flutter analyze && flutter test
 ```
 
-Backend testlar o‘tdi; lokal PostgreSQL 17.11 da Flyway V1–V5 migratsiyalari qo‘llanib, Hibernate schema tekshiruvi muvaffaqiyatli yakunlandi. Ishlatilgan Flyway versiyasi PostgreSQL 17 uchun moslik ogohlantirishini beradi (rasmiy tekshirilgan eng so‘nggi major versiya 16); production’da tanlangan PostgreSQL/Flyway versiyalarini alohida tekshiring. Haqiqiy SMS, payment webhook va iOS release oqimlari credentials hamda tegishli build muhitida alohida tasdiqlanishi kerak.
+Backend Maven testlarining 9 tasi muvaffaqiyatli. PostgreSQL 17.11’da V1–V7 migratsiyalari, takroriy emailni normallashtirish, eski emaili bog‘lanmagan OTP’larni bekor qilish va Hibernate `validate` startup smoke-testdan o‘tdi; bu production ma’lumotlar nusxasida alohida tekshiruv o‘tkazish zaruratini bekor qilmaydi. Flyway PostgreSQL 17 uchun moslik ogohlantirishi beradi, shuning uchun production PostgreSQL/Flyway versiyasini alohida tekshiring. Flutter/Dart SDK bo‘lmagani uchun yangi mobile auth analyzer/test’lari bajarilmadi. Haqiqiy SMS, payment webhook va iOS release oqimlari credentials hamda tegishli build muhitida alohida tasdiqlanishi kerak.
 
-## Railway joylash
+## Joylashtirish
 
-Root `Dockerfile` web frontend va Spring Boot API’ni bitta Railway service’da ishga tushirish uchun tayyorlandi; kerakli Railway va PostgreSQL variable’lari `docs/RAILWAY_DEPLOY.md` da berilgan. Bu sozlama live deploy qilindi degani emas: Railway project/access, PostgreSQL service va haqiqiy SMS credentials kerak. Ular sozlanmaguncha ilova production-ready deb hisoblanmaydi.
+Joriy avtomatik joylashtirish oqimi `docs/DEPLOY.md` da qayd etilgan: frontend Vercel’da, backend esa GitHub Actions orqali serverga yuboriladi. `docs/RAILWAY_DEPLOY.md` eski Railway qo‘llanmasi bo‘lib, joriy deploy yo‘li emas. Backend secret’lari Vercel frontend’iga avtomatik uzatilmaydi; ularni Spring Boot ishlayotgan server muhitiga kiritish bo‘yicha bosqichlar `docs/VERCEL_DEPLOY.md` da berilgan. Backend’ni Vercel Container Runtime’ga ko‘chirish alohida deploy konfiguratsiyasi va tekshiruvini talab qiladi; hozircha buni bajarilgan deb hisoblamang.
 
 ## Hali egasi tasdiqlashi shart bo‘lganlar
 

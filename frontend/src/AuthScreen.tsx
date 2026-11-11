@@ -10,7 +10,12 @@ function normalizeUzPhone(value: string) {
   return `+998${local}`;
 }
 
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
 export default function AuthScreen({ onAuthenticated, onBack }: Props) {
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [challenge, setChallenge] = useState<{ deliveryMode: string; debugCode?: string | null; expiresInSeconds: number } | null>(null);
@@ -21,14 +26,20 @@ export default function AuthScreen({ onAuthenticated, onBack }: Props) {
     event.preventDefault();
     setError('');
     const normalized = normalizeUzPhone(phone);
+    const normalizedEmail = normalizeEmail(email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || normalizedEmail.length > 255) {
+      setError('To‘g‘ri email manzilini kiriting.');
+      return;
+    }
     if (!/^\+998\d{9}$/.test(normalized)) {
       setError('O‘zbekiston telefon raqamini 9 ta raqam bilan kiriting.');
       return;
     }
     setBusy(true);
     try {
-      const result = await api.requestOtp(normalized);
+      const result = await api.requestOtp(normalized, normalizedEmail);
       setPhone(normalized);
+      setEmail(normalizedEmail);
       setChallenge(result);
       setCode('');
     } catch (issue) {
@@ -44,7 +55,7 @@ export default function AuthScreen({ onAuthenticated, onBack }: Props) {
     if (!/^\d{6}$/.test(code)) { setError('SMS kod 6 ta raqamdan iborat bo‘lishi kerak.'); return; }
     setBusy(true);
     try {
-      const tokens = await api.verifyOtp(phone, code);
+      const tokens = await api.verifyOtp(phone, normalizeEmail(email), code);
       saveSession(tokens);
       const user = await api.me();
       onAuthenticated(user);
@@ -67,8 +78,10 @@ export default function AuthScreen({ onAuthenticated, onBack }: Props) {
             <form className="auth-form" onSubmit={submitPhone}>
               <div className="auth-step-icon"><Smartphone size={20} /></div>
               <span className="auth-eyebrow">XUSH KELIBSIZ</span>
-              <h2>Hisobingizga kiring</h2>
-              <p>Telefon raqamingizga bir martalik tasdiqlash kodini yuboramiz.</p>
+              <h2>Hisobga kiring yoki yarating</h2>
+              <p>Email va telefon raqamingizni kiriting. Tasdiqlash kodi SMS orqali yuboriladi.</p>
+              <label htmlFor="auth-email">Email</label>
+              <input className="auth-email-input" id="auth-email" type="email" inputMode="email" autoComplete="email" maxLength={255} placeholder="ism@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
               <label htmlFor="auth-phone">Telefon raqam</label>
               <div className="auth-phone-field"><span>+998</span><input id="auth-phone" type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="90 123 45 67" value={phone.replace(/^\+?998/, '')} onChange={(event) => setPhone(event.target.value.replace(/^\+?998/, ''))} aria-describedby="auth-phone-hint" /></div>
               <small id="auth-phone-hint" className="auth-hint">O‘zbekiston raqami, masalan 90 123 45 67</small>
@@ -78,11 +91,11 @@ export default function AuthScreen({ onAuthenticated, onBack }: Props) {
             </form>
           ) : (
             <form className="auth-form" onSubmit={submitCode}>
-              <button className="auth-back" type="button" onClick={() => { setChallenge(null); setCode(''); setError(''); }}><ArrowLeft size={15} /> Raqamni o‘zgartirish</button>
+              <button className="auth-back" type="button" onClick={() => { setChallenge(null); setCode(''); setError(''); }}><ArrowLeft size={15} /> Email yoki raqamni o‘zgartirish</button>
               <div className="auth-step-icon"><ShieldCheck size={20} /></div>
               <span className="auth-eyebrow">TELEFONNI TASDIQLASH</span>
               <h2>Kodni kiriting</h2>
-              <p><strong>{phone}</strong> raqamiga yuborilgan 6 xonali kodni kiriting.</p>
+              <p><strong>{phone}</strong> raqamiga yuborilgan 6 xonali kodni kiriting.<br /><span>Email: {email}</span></p>
               <label htmlFor="auth-code">Tasdiqlash kodi</label>
               <input className="auth-code-input" id="auth-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="••••••" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} />
               <div className="auth-code-meta"><span><Clock3 size={13} /> {Math.floor(challenge.expiresInSeconds / 60)} daqiqa amal qiladi</span><button type="button" onClick={() => submitPhone(new Event('submit') as unknown as FormEvent<HTMLFormElement>)} disabled={busy}>Kodni qayta yuborish</button></div>

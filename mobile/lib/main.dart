@@ -294,6 +294,7 @@ class _AuthSheet extends StatefulWidget {
 }
 
 class _AuthSheetState extends State<_AuthSheet> {
+  final _email = TextEditingController();
   final _phone = TextEditingController();
   final _code = TextEditingController();
   bool _codeSent = false;
@@ -303,10 +304,13 @@ class _AuthSheetState extends State<_AuthSheet> {
 
   @override
   void dispose() {
+    _email.dispose();
     _phone.dispose();
     _code.dispose();
     super.dispose();
   }
+
+  String get _normalizedEmail => _email.text.trim().toLowerCase();
 
   String get _normalizedPhone {
     var digits = _phone.text.replaceAll(RegExp(r'\D'), '');
@@ -315,7 +319,12 @@ class _AuthSheetState extends State<_AuthSheet> {
   }
 
   Future<void> _requestCode() async {
-    if (_normalizedPhone.length < 13) {
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(_normalizedEmail) ||
+        _normalizedEmail.length > 255) {
+      setState(() => _error = 'To‘g‘ri email manzilini kiriting.');
+      return;
+    }
+    if (!RegExp(r'^\+998\d{9}$').hasMatch(_normalizedPhone)) {
       setState(() => _error = 'To‘liq O‘zbekiston telefon raqamini kiriting.');
       return;
     }
@@ -324,7 +333,7 @@ class _AuthSheetState extends State<_AuthSheet> {
       _error = null;
     });
     try {
-      final result = await widget.api.requestOtp(_normalizedPhone);
+      final result = await widget.api.requestOtp(_normalizedPhone, _normalizedEmail);
       if (!mounted) return;
       setState(() {
         _codeSent = true;
@@ -338,7 +347,8 @@ class _AuthSheetState extends State<_AuthSheet> {
   }
 
   Future<void> _verify() async {
-    if (_code.text.trim().length != 6) {
+    final otpCode = _code.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(otpCode)) {
       setState(() => _error = '6 xonali kodni kiriting.');
       return;
     }
@@ -347,7 +357,7 @@ class _AuthSheetState extends State<_AuthSheet> {
       _error = null;
     });
     try {
-      await widget.api.verifyOtp(_normalizedPhone, _code.text.trim());
+      await widget.api.verifyOtp(_normalizedPhone, _normalizedEmail, otpCode);
       final profile = await widget.api.me();
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -370,9 +380,18 @@ class _AuthSheetState extends State<_AuthSheet> {
           children: [
             const _SectionHeader(
                 title: 'MELARIUM hisobiga kirish',
-                subtitle: 'Telefon orqali bir martalik OTP'),
+                subtitle: 'Email va telefon; OTP SMS orqali'),
             const SizedBox(height: 16),
             if (!_codeSent) ...[
+              TextField(
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  textCapitalization: TextCapitalization.none,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: const InputDecoration(
+                      labelText: 'Email', hintText: 'ism@example.com')),
+              const SizedBox(height: 12),
               TextField(
                   controller: _phone,
                   keyboardType: TextInputType.phone,
@@ -387,7 +406,7 @@ class _AuthSheetState extends State<_AuthSheet> {
                       ? const _ButtonProgress()
                       : const Text('Tasdiqlash kodini yuborish')),
             ] else ...[
-              Text('Kod $_normalizedPhone raqamiga yuborildi.',
+              Text('Kod $_normalizedPhone raqamiga yuborildi. Email: $_normalizedEmail',
                   style: const TextStyle(color: Color(0xFF66756B))),
               if (_debugCode != null)
                 Padding(
@@ -417,7 +436,7 @@ class _AuthSheetState extends State<_AuthSheet> {
                             _debugCode = null;
                             _error = null;
                           }),
-                  child: const Text('Telefon raqamni o‘zgartirish')),
+                  child: const Text('Email yoki telefonni o‘zgartirish')),
             ],
             if (_error != null)
               Padding(

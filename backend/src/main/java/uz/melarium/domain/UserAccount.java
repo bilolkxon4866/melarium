@@ -1,6 +1,7 @@
 package uz.melarium.domain;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -59,8 +60,14 @@ public class UserAccount {
 
     public void updateProfile(String fullName, String email, String profileImageData) {
         if (fullName != null) this.fullName = fullName.trim();
-        if (email != null) this.email = email.isBlank() ? null : email.trim().toLowerCase();
+        if (email != null) this.email = normalizeEmail(email);
         if (profileImageData != null) this.profileImageData = profileImageData.isBlank() ? null : profileImageData;
+    }
+
+    public static String normalizeEmail(String email) {
+        if (email == null) return null;
+        String normalized = email.trim();
+        return normalized.isEmpty() ? null : normalized.toLowerCase(Locale.ROOT);
     }
 
     public void changeAccountStatus(String nextStatus) {

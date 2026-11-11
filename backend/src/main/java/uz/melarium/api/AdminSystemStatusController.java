@@ -34,7 +34,10 @@ public class AdminSystemStatusController {
             @Value("${app.security.expose-otp:false}") boolean otpCodeExposureEnabled,
             @Value("${app.investment.terms-version:}") String termsVersion,
             @Value("${app.payments.enabled:false}") boolean paymentsEnabled,
-            @Value("${app.security.bootstrap-admin-phone:}") String bootstrapAdminPhone) {
+            @Value("${app.security.admin-email:}") String adminEmail,
+            @Value("${app.security.admin-phone:}") String adminPhone,
+            @Value("${app.security.super-admin-email:}") String superAdminEmail,
+            @Value("${app.security.super-admin-phone:}") String superAdminPhone) {
         this.timezone = timezone;
         this.demoMode = demoMode;
         this.smsProvider = smsProvider == null ? "unknown" : smsProvider;
@@ -45,7 +48,12 @@ public class AdminSystemStatusController {
         this.configuredPaymentProviders = gateways.stream().filter(PaymentGateway::isConfigured)
                 .map(PaymentGateway::provider).sorted().toList();
         this.paymentsEnabled = paymentsEnabled && investmentTermsConfigured && !configuredPaymentProviders.isEmpty();
-        this.bootstrapAdminConfigured = bootstrapAdminPhone != null && !bootstrapAdminPhone.isBlank();
+        this.bootstrapAdminConfigured = isConfiguredPair(adminEmail, adminPhone)
+                || isConfiguredPair(superAdminEmail, superAdminPhone);
+    }
+
+    private boolean isConfiguredPair(String email, String phone) {
+        return email != null && !email.isBlank() && phone != null && !phone.isBlank();
     }
 
     @GetMapping("/status")

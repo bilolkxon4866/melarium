@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
     Optional<UserAccount> findByPhone(String phone);
+    boolean existsByEmailIgnoreCaseAndPhoneNot(String email, String phone);
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);
     long countByAccountStatus(String accountStatus);
 
     @Query("""
