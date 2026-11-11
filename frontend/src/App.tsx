@@ -1306,6 +1306,10 @@ function ProfilePage({ user, role, onSave }: { user: UserProfile; role: Role; on
       <PageHeading eyebrow="SHAXSIY KABINET" title="Profil" description="Shaxsiy ma’lumotlar va hisob xavfsizligini boshqaring." />
       <div className="profile-layout">
         <section className="panel profile-card">
+          <div className="profile-cover" aria-hidden="true">
+            {profileImageData && <img className="profile-cover-image" src={profileImageData} alt="" />}
+            <div className="profile-cover-tint" />
+          </div>
           <form className="profile-main" onSubmit={(event) => void submit(event)}>
             <div className="profile-identity">
               <div className="profile-avatar-wrap">
