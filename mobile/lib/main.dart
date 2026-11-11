@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import 'api_client.dart';
@@ -1101,15 +1104,58 @@ class _MarketplacePage extends StatefulWidget {
 
 class _MarketplacePageState extends State<_MarketplacePage> {
   String _query = '';
+  Timer? _searchTimer;
+  int _searchGeneration = 0;
+  List<Map<String, dynamic>>? _serverResults;
+  bool _searching = false;
+
+  @override
+  void dispose() {
+    _searchTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String value) {
+    _searchTimer?.cancel();
+    final generation = ++_searchGeneration;
+    final term = value.trim();
+    setState(() {
+      _query = value;
+      _serverResults = null;
+      _searching = term.isNotEmpty;
+    });
+    if (term.isEmpty) return;
+    _searchTimer = Timer(const Duration(milliseconds: 300),
+        () => _searchOnServer(term, generation));
+  }
+
+  Future<void> _searchOnServer(String term, int generation) async {
+    try {
+      final result = await widget.api.get(
+          '/listings?query=${Uri.encodeQueryComponent(term)}&page=0&size=100');
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _serverResults = mapList(result['content']);
+        _searching = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _serverResults = null;
+        _searching = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final items = widget.items.where((item) {
+    final source = _serverResults ?? widget.items;
+    final query = _query.toLowerCase().trim();
+    final items = source.where((item) {
       if (item['status'] != 'ACTIVE') return false;
-      final q = _query.toLowerCase();
       return '${item['title']} ${item['location']} ${item['description']}'
           .toLowerCase()
-          .contains(q);
+          .contains(query);
     }).toList();
     return ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -1122,13 +1168,21 @@ class _MarketplacePageState extends State<_MarketplacePage> {
               decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search_rounded),
                   hintText: 'Taklif yoki joylashuv qidirish'),
-              onChanged: (value) => setState(() => _query = value)),
+              onChanged: _onQueryChanged),
+          if (_searching)
+            const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: LinearProgressIndicator(minHeight: 2, color: leaf)),
           const SizedBox(height: 12),
           if (widget.role == 'USER')
             const _WarningCard(
                 text:
                     'Oddiy foydalanuvchi takliflarni ko‘rishi mumkin. Buyurtma yaratish uchun administrator Investor rolini tayinlaydi.'),
-          if (items.isEmpty)
+          if (items.isEmpty && _searching)
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator(color: leaf)))
+          else if (items.isEmpty)
             const _EmptyCard(
                 icon: Icons.search_off_rounded,
                 title: 'Faol taklif topilmadi',
@@ -2291,15 +2345,28 @@ class _ProfilePageState extends State<_ProfilePage> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: const Color(0xFFEAF3EA),
-                    child: Text(initials(displayName(widget.profile)),
-                        style: const TextStyle(
-                            color: forest,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 19)),
-                  ),
+                  Builder(builder: (context) {
+                    ImageProvider<Object>? avatarImage;
+                    final imageData = widget.profile['profileImageData'];
+                    if (imageData is String &&
+                        imageData.startsWith('data:image/jpeg;base64,')) {
+                      try {
+                        avatarImage = MemoryImage(
+                            base64Decode(imageData.substring(imageData.indexOf(',') + 1)));
+                      } catch (_) {
+                        avatarImage = null;
+                      }
+                    }
+                    return CircleAvatar(
+                      radius: 36,
+                      backgroundColor: const Color(0xFFEAF3EA),
+                      backgroundImage: avatarImage,
+                      child: avatarImage == null
+                          ? const Icon(Icons.person_outline_rounded,
+                              color: forest, size: 32)
+                          : null,
+                    );
+                  }),
                   const SizedBox(height: 10),
                   Text(displayName(widget.profile),
                       style: const TextStyle(

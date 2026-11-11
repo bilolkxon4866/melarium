@@ -25,6 +25,7 @@ export interface UserProfile {
   accountStatus: string;
   roles: string[];
   createdAt: string;
+  profileImageData?: string | null;
 }
 export interface OtpRequestResponse { phone: string; expiresInSeconds: number; deliveryMode: string; debugCode?: string | null }
 export interface ApiPage<T> { content: T[]; page: number; size: number; totalElements: number; totalPages: number; first: boolean; last: boolean }
@@ -176,7 +177,7 @@ export const api = {
     else clearSession();
   },
   me: () => send<UserProfile>('/users/me'),
-  updateProfile: (fullName: string, email: string) => send<UserProfile>('/users/me', { method: 'PATCH', body: JSON.stringify({ fullName, email }) }),
+  updateProfile: (fullName: string, email: string, profileImageData: string) => send<UserProfile>('/users/me', { method: 'PATCH', body: JSON.stringify({ fullName, email, profileImageData }) }),
   listings: (query = '', page = 0, size = 50) => send<ApiPage<ListingDto>>(`/listings?query=${encodeURIComponent(query)}&page=${page}&size=${size}`),
   myListings: () => send<ListingDto[]>('/listings/my'),
   moderationQueue: (page = 0, size = 50) => send<ApiPage<ListingDto>>(`/listings/moderation?page=${page}&size=${size}`),

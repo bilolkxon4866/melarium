@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import AuthScreen from './AuthScreen';
 import { api, clearSession, hasSession, type AdminDashboardDto, type AdminUserDto, type ApiPage, type ApiaryDto, type AuditLogDto, type BeekeeperReportDto, type ColonyDto, type ExpenseDto, type HarvestDto, type InvestmentDto, type InvestorReportDto, type ListingDto, type NotificationDto, type NotificationPreferencesDto, type PaymentDto, type SensorReadingDto, type SupportTicketDto, type UserProfile } from './api';
 import {
@@ -10,7 +10,9 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarDays,
+  Camera,
   Check,
+  CornerDownLeft,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -22,7 +24,6 @@ import {
   Download,
   Droplets,
   FileText,
-  Filter,
   Flower2,
   Globe2,
   HandCoins,
@@ -35,12 +36,15 @@ import {
   Menu,
   MoreHorizontal,
   Plus,
+  Phone,
   Search,
   Settings2,
   ShieldCheck,
   Sprout,
   Thermometer,
   TrendingUp,
+  Trash2,
+  UserRound,
   Users,
   WalletCards,
   X,
@@ -57,6 +61,7 @@ type PageId =
   | 'notifications'
   | 'support'
   | 'profile'
+  | 'search'
   | 'apiaries'
   | 'colonies'
   | 'harvests'
@@ -99,6 +104,7 @@ type ExpenseRecord = { id: string; place: string; date: string; amount: number; 
 type NotificationItem = { id: string; title: string; body: string; time: string; kind: 'payment' | 'report' | 'listing' | 'system'; read: boolean };
 type Apiary = { id: string; name: string; place: string; description?: string; colonies: number; status: string };
 type ModalProps = { kind: ModalId; listing: Listing | null; apiary: Apiary | null; colony: ColonyDto | null; apiaries: Apiary[]; colonies: ColonyDto[]; canInvest: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onOpenInvest: () => void };
+type SearchResult = { id: string; category: string; title: string; subtitle: string; searchText: string; page: PageId; icon: LucideIcon; listing?: Listing };
 
 const ROLE_LABELS: Record<Role, string> = {
   user: 'Oddiy foydalanuvchi',
@@ -185,7 +191,7 @@ export default function App() {
   if (checkingSession) return <div className="session-loading"><LoaderCircle className="spin" size={22} /><span>Hisob tekshirilmoqda…</span></div>;
   if (!user) return <GuestApp onAuthenticated={finishLogin} />;
   if (!user.roles.length) return <div className="session-loading"><CircleHelp size={22} /><span>Hisobga rol biriktirilmagan. Administratorga murojaat qiling.</span><button className="button button-outline" onClick={() => void logout()}>Chiqish</button></div>;
-  return <DashboardApp user={user} onLogout={logout} />;
+  return <DashboardApp user={user} onUserUpdate={setUser} onLogout={logout} />;
 }
 
 function GuestApp({ onAuthenticated }: { onAuthenticated: (user: UserProfile) => void }) {
@@ -277,7 +283,11 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase() || 'M';
 }
 
-function DashboardApp({ user, onLogout }: { user: UserProfile; onLogout: () => void }) {
+function normalizeSearchText(value: string) {
+  return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[’‘ʻʼ`']/g, '').toLocaleLowerCase('uz-UZ').replace(/\s+/g, ' ').trim();
+}
+
+function DashboardApp({ user, onUserUpdate, onLogout }: { user: UserProfile; onUserUpdate: (user: UserProfile) => void; onLogout: () => void }) {
   const [role, setRole] = useState<Role>(() => initialRole(user));
   const [activePage, setActivePage] = useState<PageId>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -311,6 +321,9 @@ function DashboardApp({ user, onLogout }: { user: UserProfile; onLogout: () => v
   const [adminSupportTickets, setAdminSupportTickets] = useState<SupportTicketDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [remoteSearchListings, setRemoteSearchListings] = useState<Listing[] | null>(null);
+  const [remoteSearchUsers, setRemoteSearchUsers] = useState<AdminUserDto[] | null>(null);
+  const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
 
   const accountName = user.fullName?.trim() || user.phone;
   const availableRoles = [...new Set(user.roles.map(viewRole).filter((item): item is Role => item !== null))];
@@ -442,6 +455,105 @@ function DashboardApp({ user, onLogout }: { user: UserProfile; onLogout: () => v
 
   useEffect(() => { void refreshData(); }, [role, user.id]);
 
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (activePage !== 'search' || !query) {
+      setRemoteSearchListings(null);
+      setRemoteSearchUsers(null);
+      setGlobalSearchLoading(false);
+      return;
+    }
+
+    let alive = true;
+    setRemoteSearchListings(null);
+    setRemoteSearchUsers(null);
+    setGlobalSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      const requests: Promise<void>[] = [
+        api.listings(query, 0, 100).then((response) => {
+          if (alive) setRemoteSearchListings(response.content.map(mapListing));
+        }).catch(() => undefined),
+      ];
+      if (role === 'admin') {
+        requests.push(api.adminUsers(query, 0, 100).then((response) => {
+          if (alive) setRemoteSearchUsers(response.content);
+        }).catch(() => undefined));
+      }
+      void Promise.all(requests).finally(() => { if (alive) setGlobalSearchLoading(false); });
+    }, 250);
+
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [activePage, role, searchQuery]);
+
+  const searchResults = useMemo<SearchResult[]>(() => {
+    const query = normalizeSearchText(searchQuery);
+    if (!query) return [];
+    const results: SearchResult[] = [];
+    const add = (item: SearchResult) => {
+      if (normalizeSearchText(`${item.category} ${item.title} ${item.subtitle} ${item.searchText}`).includes(query)) results.push(item);
+    };
+    const listingMap = new Map<string, Listing>();
+    [...publicListings, ...listings, ...(remoteSearchListings || [])].forEach((item) => listingMap.set(item.id, item));
+    listingMap.forEach((item) => add({
+      id: `listing:${item.id}`, category: 'Taklif', title: item.name,
+      subtitle: `${item.place} · ${labelStatus(item.status)} · ${formatMoney(item.price)}`,
+      searchText: `${item.description} ${item.category} ${item.beekeeper} ${item.id}`,
+      page: 'listings', icon: Sprout, listing: item,
+    }));
+    add({ id: 'profile:me', category: 'Profil', title: user.fullName?.trim() || 'Shaxsiy profil',
+      subtitle: `${user.phone}${user.email ? ` · ${user.email}` : ''}`, searchText: `${user.id} ${user.accountStatus}`,
+      page: 'profile', icon: UserRound });
+    const apiaryNames = new Map(apiaries.map((item) => [item.id, item.name]));
+    const colonyCodes = new Map(colonies.map((item) => [item.id, item.code || item.id]));
+    apiaries.forEach((item) => add({ id: `apiary:${item.id}`, category: 'Asalarixona', title: item.name,
+      subtitle: `${item.place} · ${item.colonies} ta ari oilasi`, searchText: `${item.description || ''} ${item.status} ${item.id}`,
+      page: 'apiaries', icon: Building2 }));
+    colonies.forEach((item) => add({ id: `colony:${item.id}`, category: 'Ari oilasi', title: item.code || `Ari oilasi · ${item.count} ta`,
+      subtitle: `${apiaryNames.get(item.apiaryId) || item.apiaryId} · ${labelStatus(item.status)}`,
+      searchText: `${item.description} ${item.strength || ''} ${item.count} ${item.id}`,
+      page: 'colonies', icon: Flower2 }));
+    investments.forEach((item) => add({ id: `investment:${item.id}`, category: 'Buyurtma', title: item.listingName,
+      subtitle: `${item.place} · ${item.status} · ${formatMoney(item.amount)}`,
+      searchText: `${item.id} ${item.quantity}`, page: 'investments', icon: BriefcaseBusiness }));
+    harvests.forEach((item) => add({ id: `harvest:${item.id}`, category: 'Hosil qaydi', title: `${item.place} · ${item.amount.toLocaleString('uz-UZ')} kg`,
+      subtitle: `${item.date} · ${item.status}`, searchText: `${item.id} ${item.note}`,
+      page: 'harvests', icon: Droplets }));
+    expenses.forEach((item) => add({ id: `expense:${item.id}`, category: 'Xarajat', title: `${item.place} · ${formatMoney(item.amount)}`,
+      subtitle: `${item.category} · ${item.date}`, searchText: item.id, page: 'harvests', icon: CreditCard }));
+    sensorReadings.forEach((item) => add({ id: `sensor:${item.id}`, category: 'Sensor qaydi', title: `${item.metric === 'TEMPERATURE' ? 'Harorat' : item.metric === 'HUMIDITY' ? 'Namlik' : 'Vazn'} · ${Number(item.value).toLocaleString('uz-UZ')} ${item.unit}`,
+      subtitle: `${apiaryNames.get(item.apiaryId) || item.apiaryId} · ${formatDate(item.recordedAt)}`,
+      searchText: `${item.id} ${item.source} ${item.colonyId ? colonyCodes.get(item.colonyId) || item.colonyId : ''}`,
+      page: 'sensors', icon: Thermometer }));
+    notifications.forEach((item) => add({ id: `notification:${item.id}`, category: 'Bildirishnoma', title: item.title,
+      subtitle: `${item.time} · ${item.read ? 'O‘qildi' : 'O‘qilmagan'}`, searchText: `${item.body} ${item.kind} ${item.id}`,
+      page: 'notifications', icon: Bell }));
+    const searchableTickets = role === 'admin' ? adminSupportTickets : supportTickets;
+    searchableTickets.forEach((item) => add({ id: `ticket:${item.id}`, category: 'Murojaat', title: item.subject,
+      subtitle: `${supportCategory(item.category)} · ${supportStatus(item.status)}`,
+      searchText: `${item.message} ${item.adminNote} ${item.id} ${item.userId}`,
+      page: 'support', icon: CircleHelp }));
+    if (role === 'admin') {
+      const searchableUsers = new Map<string, AdminUserDto>();
+      [...adminUsers, ...(remoteSearchUsers || [])].forEach((item) => searchableUsers.set(item.id, item));
+      searchableUsers.forEach((item) => add({ id: `user:${item.id}`, category: 'Foydalanuvchi',
+        title: item.fullName?.trim() || 'Ism kiritilmagan', subtitle: `${item.phone}${item.email ? ` · ${item.email}` : ''}`,
+        searchText: `${item.id} ${item.roles.join(' ')} ${item.accountStatus}`,
+        page: 'users', icon: Users }));
+    }
+    const payments = role === 'admin' ? adminPayments : myPayments;
+    payments.forEach((item) => add({ id: `payment:${item.id}`, category: 'To‘lov', title: `${formatMoney(Number(item.amount))} · ${labelStatus(item.status)}`,
+      subtitle: `${item.provider} · ${formatDate(item.paidAt || item.createdAt)}`,
+      searchText: `${item.id} ${item.investmentId} ${item.providerTransactionId || ''} ${item.currency}`,
+      page: 'payments', icon: WalletCards }));
+    if (role === 'admin') {
+      auditLogs.forEach((item) => add({ id: `audit:${item.id}`, category: 'Audit qaydi', title: item.action,
+        subtitle: `${item.entityType}${item.entityId ? ` · ${item.entityId}` : ''} · ${item.outcome}`,
+        searchText: `${item.actorId || ''} ${JSON.stringify(item.details)} ${item.id}`,
+        page: 'audit', icon: ClipboardList }));
+    }
+    return results.slice(0, 250);
+  }, [searchQuery, publicListings, listings, remoteSearchListings, user, apiaries, colonies, investments, harvests, expenses, sensorReadings, notifications, role, adminSupportTickets, supportTickets, remoteSearchUsers, adminUsers, adminPayments, myPayments, auditLogs]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -509,8 +621,8 @@ function DashboardApp({ user, onLogout }: { user: UserProfile; onLogout: () => v
     try { await api.updateUserRoles(id, roles); await refreshData(); showToast('Foydalanuvchi rollari yangilandi.'); }
     catch (issue) { showToast(issue instanceof Error ? issue.message : 'Rollarni yangilab bo‘lmadi.'); }
   };
-  const updateProfile = async (fullName: string, email: string) => {
-    try { await api.updateProfile(fullName, email); showToast('Profil yangilandi.'); window.location.reload(); }
+  const updateProfile = async (fullName: string, email: string, profileImageData: string) => {
+    try { const updated = await api.updateProfile(fullName, email, profileImageData); onUserUpdate(updated); showToast('Profil yangilandi.'); }
     catch (issue) { showToast(issue instanceof Error ? issue.message : 'Profilni yangilab bo‘lmadi.'); }
   };
   const deactivateApiary = async (item: Apiary) => {
@@ -531,9 +643,11 @@ function DashboardApp({ user, onLogout }: { user: UserProfile; onLogout: () => v
     try { await api.reviewSupportTicket(id, status, adminNote); await refreshData(); showToast('Murojaat holati yangilandi.'); }
     catch (issue) { showToast(issue instanceof Error ? issue.message : 'Murojaatni yangilab bo‘lmadi.'); }
   };
-  const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => { if (event.key === 'Enter') changePage('listings'); };
+  const submitGlobalSearch = () => { if (!searchQuery.trim()) { showToast('Qidirish uchun so‘z kiriting.'); return; } changePage('search'); };
+  const selectSearchResult = (result: SearchResult) => { if (result.listing) { changePage('listings'); openListing(result.listing); } else changePage(result.page); };
 
   const renderPage = () => {
+    if (activePage === 'search') return <SearchResultsPage query={searchQuery} results={searchResults} loading={globalSearchLoading} onSelect={selectSearchResult} />;
     if (activePage === 'public') return <PublicPage listings={publicListings} totalListings={publicListingCount} onBrowse={() => changePage('listings')} onDetail={(item) => openListing(item)} onContact={() => changePage('support')} />;
     if (activePage === 'overview') return <Dashboard role={role} profile={user} investments={role === 'admin' ? adminInvestments : investments} totalInvested={totalInvested} apiaries={apiaries} listings={role === 'beekeeper' ? listings : publicListings} notifications={notifications} investorReport={investorReport} beekeeperReport={beekeeperReport} adminDashboard={adminDashboard} onNavigate={changePage} onOpenModal={setModal} onDetail={(item) => openListing(item)} />;
     if (activePage === 'listings') {
@@ -556,7 +670,7 @@ function DashboardApp({ user, onLogout }: { user: UserProfile; onLogout: () => v
     return <ProfilePage user={user} role={role} onSave={updateProfile} />;
   };
 
-  const pageTitle = activePage === 'public' ? 'Ochiq sayt' : NAV_ITEMS[role].find((item) => item.id === activePage)?.label || (activePage === 'profile' ? 'Profil' : 'Sozlamalar');
+  const pageTitle = activePage === 'public' ? 'Ochiq sayt' : activePage === 'search' ? 'Qidiruv' : NAV_ITEMS[role].find((item) => item.id === activePage)?.label || (activePage === 'profile' ? 'Profil' : 'Sozlamalar');
   const fullName = accountName;
   const canSeeNav = NAV_ITEMS[role];
 
@@ -579,7 +693,7 @@ function DashboardApp({ user, onLogout }: { user: UserProfile; onLogout: () => v
         <button className={`public-link ${activePage === 'public' ? 'active' : ''}`} onClick={() => changePage('public')}><Globe2 size={17} /><span>Ochiq saytni ko‘rish</span><ArrowUpRight size={15} /></button>
         <div className="sidebar-bottom">
           <div className="help-card"><div className="help-icon"><CircleHelp size={17} /></div><div><strong>Yordam kerakmi?</strong><span>Biz bilan bog‘laning</span></div><ChevronRight size={16} /></div>
-          <div className="sidebar-user"><div className="avatar">{initials(fullName)}</div><div className="sidebar-user-copy"><strong>{fullName}</strong><span>{ROLE_LABELS[role]}</span></div><button className="icon-plain" title="Chiqish" onClick={onLogout}><LogOut size={17} /></button></div>
+          <div className="sidebar-user"><div className="avatar">{user.profileImageData ? <img src={user.profileImageData} alt="" /> : initials(fullName)}</div><div className="sidebar-user-copy"><strong>{fullName}</strong><span>{ROLE_LABELS[role]}</span></div><button className="icon-plain" title="Chiqish" onClick={onLogout}><LogOut size={17} /></button></div>
           <div className="sidebar-footnote">MELARIUM · MVP</div>
         </div>
       </aside>
@@ -588,10 +702,15 @@ function DashboardApp({ user, onLogout }: { user: UserProfile; onLogout: () => v
         <header className="topbar">
           <div className="topbar-left"><button className="mobile-menu-button icon-plain" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Menyuni ochish"><Menu size={21} /></button><div className="breadcrumbs"><span>MELARIUM</span><ChevronRight size={14} /><strong>{pageTitle}</strong></div></div>
           <div className="topbar-actions">
-            <label className="global-search"><Search size={17} /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={onSearchKeyDown} placeholder="Qidirish..." aria-label="Taklif qidirish" /><kbd>↵</kbd></label>
+            <form className="global-search" role="search" onSubmit={(event) => { event.preventDefault(); submitGlobalSearch(); }}>
+              <button className="global-search-submit" type="submit" aria-label="Butun platformada qidirish"><Search size={17} /></button>
+              <input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Butun platformadan qidirish" aria-label="Butun platformadan qidirish" autoComplete="off" />
+              {searchQuery && <button className="global-search-clear" type="button" aria-label="Qidiruvni tozalash" onClick={() => setSearchQuery('')}><X size={14} /></button>}
+              <kbd aria-hidden="true"><CornerDownLeft size={13} /></kbd>
+            </form>
             {availableRoles.length > 1 && <label className="role-control" title="Sizga berilgan rolni tanlang"><span>Rol</span><select value={role} onChange={(event) => handleRoleChange(event.target.value as Role)} aria-label="Mavjud rolni tanlash">{availableRoles.map((item) => <option key={item} value={item}>{ROLE_LABELS[item]}</option>)}</select><ChevronDown size={14} /></label>}
             <button className="topbar-notification" onClick={() => changePage('notifications')} aria-label="Bildirishnomalar"><Bell size={19} />{unreadCount > 0 && <span className="notification-dot">{unreadCount}</span>}</button>
-            <div className="topbar-divider" /><button className="top-profile" onClick={() => changePage('profile')}><div className="avatar avatar-small">{initials(fullName)}</div><div className="top-profile-copy"><strong>{fullName}</strong><span>{ROLE_LABELS[role]}</span></div><ChevronDown size={15} /></button>
+            <div className="topbar-divider" /><button className="top-profile" onClick={() => changePage('profile')}><div className="avatar avatar-small">{user.profileImageData ? <img src={user.profileImageData} alt="" /> : initials(fullName)}</div><div className="top-profile-copy"><strong>{fullName}</strong><span>{ROLE_LABELS[role]}</span></div><ChevronDown size={15} /></button>
           </div>
         </header>
         <main className="main-content">
@@ -617,6 +736,32 @@ function PageHeading({ eyebrow, title, description, action, onAction }: { eyebro
       </div>
       {action && <button className="button button-primary" onClick={onAction}><Plus size={17} />{action}</button>}
     </div>
+  );
+}
+
+function SearchResultsPage({ query, results, loading, onSelect }: { query: string; results: SearchResult[]; loading: boolean; onSelect: (result: SearchResult) => void }) {
+  return (
+    <>
+      <PageHeading eyebrow="BUTUN PLATFORMADA" title="Qidiruv natijalari" description={query.trim() ? `“${query.trim()}” bo‘yicha ${results.length} ta mos natija.` : 'Qidirish uchun yuqoridagi maydonga so‘z kiriting.'} />
+      {!query.trim() ? (
+        <div className="empty-state"><Search size={24} /><strong>Qidiruv so‘zini kiriting</strong><span>Takliflar, xo‘jaliklar, buyurtmalar va mavjud yozuvlardan qidirish mumkin.</span></div>
+      ) : results.length === 0 && loading ? (
+        <div className="search-loading"><LoaderCircle size={19} className="spin" /> Ma’lumotlar qidirilmoqda…</div>
+      ) : results.length === 0 ? (
+        <div className="empty-state"><Search size={24} /><strong>Natija topilmadi</strong><span>Boshqa so‘z yoki telefon raqamini sinab ko‘ring.</span></div>
+      ) : (
+        <section className="search-results-list" aria-label="Qidiruv natijalari">
+          {results.map((result) => {
+            const Icon = result.icon;
+            return <button className="search-result-item" key={result.id} onClick={() => onSelect(result)}>
+              <span className="search-result-icon"><Icon size={18} strokeWidth={1.9} /></span>
+              <span className="search-result-copy"><span className="search-result-category">{result.category}</span><strong>{result.title}</strong><span>{result.subtitle}</span></span>
+              <ArrowRight className="search-result-arrow" size={16} />
+            </button>;
+          })}
+        </section>
+      )}
+    </>
   );
 }
 
@@ -783,12 +928,46 @@ function MiniListingCard({ item, onClick }: { item: Listing; onClick: () => void
 
 function MarketplacePage({ listings, query, onQueryChange, onDetail }: { listings: Listing[]; query: string; onQueryChange: (query: string) => void; onDetail: (item: Listing) => void }) {
   const [category, setCategory] = useState('Barchasi');
-  const categories = useMemo(() => ['Barchasi', ...new Set(listings.filter((item) => item.status === 'Faol').map((item) => item.category))], [listings]);
-  const filtered = useMemo(() => listings.filter((item) => {
-    const matchesQuery = `${item.name} ${item.place} ${item.beekeeper}`.toLowerCase().includes(query.toLowerCase());
-    const matchesCategory = category === 'Barchasi' || item.category === category;
-    return item.status === 'Faol' && matchesQuery && matchesCategory;
-  }), [listings, query, category]);
+  const [serverMatches, setServerMatches] = useState<Listing[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  useEffect(() => {
+    const term = query.trim();
+    if (!term) {
+      setServerMatches(null);
+      setSearchLoading(false);
+      return;
+    }
+    let alive = true;
+    setServerMatches(null);
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      api.listings(term, 0, 100).then((response) => {
+        if (alive) setServerMatches(response.content.map(mapListing));
+      }).catch(() => {
+        if (alive) setServerMatches(null);
+      }).finally(() => {
+        if (alive) setSearchLoading(false);
+      });
+    }, 250);
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [query]);
+
+  const searchPool = useMemo(() => {
+    const unique = new Map<string, Listing>();
+    [...listings, ...(serverMatches || [])].forEach((item) => unique.set(item.id, item));
+    return [...unique.values()];
+  }, [listings, serverMatches]);
+  const categories = useMemo(() => ['Barchasi', ...new Set(searchPool.filter((item) => item.status === 'Faol').map((item) => item.category))], [searchPool]);
+  const filtered = useMemo(() => {
+    const normalizedQuery = normalizeSearchText(query);
+    return searchPool.filter((item) => {
+      const searchable = normalizeSearchText(`${item.name} ${item.place} ${item.beekeeper} ${item.description} ${item.category} ${item.id}`);
+      const matchesQuery = !normalizedQuery || searchable.includes(normalizedQuery);
+      const matchesCategory = category === 'Barchasi' || item.category === category;
+      return item.status === 'Faol' && matchesQuery && matchesCategory;
+    });
+  }, [searchPool, query, category]);
 
   return (
     <>
@@ -800,12 +979,11 @@ function MarketplacePage({ listings, query, onQueryChange, onDetail }: { listing
       <div className="market-toolbar">
         <div><div className="eyebrow">BOZOR</div><h2>Mavjud takliflar <span className="count-badge">{filtered.length}</span></h2></div>
         <div className="market-controls">
-          <label className="market-search"><Search size={16} /><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Xo‘jalik qidirish" /></label>
-          <button className="filter-button"><Filter size={16} /> Filtr <ChevronDown size={14} /></button>
+          <label className="market-search"><Search size={16} /><input type="search" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Xo‘jalik yoki joylashuv" aria-label="Takliflar va joylashuvni qidirish" /></label>
         </div>
       </div>
-      <div className="filter-tabs">{categories.map((item) => <button key={item} className={category === item ? 'selected' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
-      {filtered.length === 0 ? <div className="empty-state"><Search size={25} /><strong>Taklif topilmadi</strong><span>Qidiruv so‘zini yoki filtrni o‘zgartirib ko‘ring.</span></div> : <div className="listing-grid">{filtered.map((item, index) => <ListingCard key={item.id} item={item} index={index} onClick={() => onDetail(item)} />)}</div>}
+      <div className="filter-tabs" aria-label="Taklif turi bo‘yicha filtr">{categories.map((item) => <button type="button" key={item} className={category === item ? 'selected' : ''} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}</div>
+      {filtered.length === 0 && searchLoading ? <div className="search-loading"><LoaderCircle size={18} className="spin" /> Takliflar qidirilmoqda…</div> : filtered.length === 0 ? <div className="empty-state"><Search size={25} /><strong>Taklif topilmadi</strong><span>Qidiruv so‘zini yoki filtrni o‘zgartirib ko‘ring.</span></div> : <div className="listing-grid">{filtered.map((item, index) => <ListingCard key={item.id} item={item} index={index} onClick={() => onDetail(item)} />)}</div>}
     </>
   );
 }
@@ -972,13 +1150,38 @@ function supportStatus(value: SupportTicketDto['status']) { return value === 'IN
 
 function UsersPage({ users, currentUserId, canAssignAdmin, onStatus, onRoles }: { users: AdminUserDto[]; currentUserId: string; canAssignAdmin: boolean; onStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED') => void; onRoles: (id: string, roles: string[]) => void }) {
   const [query, setQuery] = useState('');
-  const filtered = users.filter((user) => `${user.fullName || ''} ${user.phone} ${user.email || ''}`.toLowerCase().includes(query.toLowerCase()));
+  const [serverUsers, setServerUsers] = useState<AdminUserDto[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  useEffect(() => {
+    const term = query.trim();
+    if (!term) { setServerUsers(null); setSearchLoading(false); return; }
+    let alive = true;
+    setServerUsers(null);
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      api.adminUsers(term, 0, 100).then((response) => {
+        if (alive) setServerUsers(response.content);
+      }).catch(() => {
+        if (alive) setServerUsers(null);
+      }).finally(() => {
+        if (alive) setSearchLoading(false);
+      });
+    }, 250);
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [query]);
+  const filtered = useMemo(() => {
+    const term = normalizeSearchText(query);
+    const localMatches = users.filter((user) => normalizeSearchText(`${user.fullName || ''} ${user.phone} ${user.email || ''} ${user.id} ${user.roles.join(' ')} ${user.accountStatus}`).includes(term));
+    const unique = new Map<string, AdminUserDto>();
+    [...localMatches, ...(serverUsers || [])].forEach((user) => unique.set(user.id, user));
+    return [...unique.values()];
+  }, [users, serverUsers, query]);
   const roleOptions = ['USER', 'INVESTOR', 'BEEKEEPER', 'ADMIN', 'SUPER_ADMIN'];
   const toggleRole = (user: AdminUserDto, role: string, checked: boolean) => {
     const next = checked ? [...new Set([...user.roles, role])] : user.roles.filter((item) => item !== role);
     onRoles(user.id, next);
   };
-  return <><PageHeading eyebrow="ADMIN PANEL" title="Foydalanuvchilar" description="Foydalanuvchi rollari va hisob holatlarini boshqaring." /><div className="stats-grid compact-stats"><StatCard title="Yuklangan foydalanuvchi" value={`${users.length} ta`} helper="Joriy ro‘yxat" icon={Users} tone="green" /><StatCard title="Asalarichilar" value={`${users.filter((user) => user.roles.includes('BEEKEEPER')).length} ta`} helper="BEEKEEPER roli berilgan" icon={Sprout} tone="honey" /><StatCard title="To‘xtatilgan" value={`${users.filter((user) => user.accountStatus === 'SUSPENDED').length} ta`} helper="Hisob holati" icon={ShieldCheck} tone="blue" /></div><section className="panel full-table-panel"><div className="panel-heading"><div><div className="panel-kicker">FOYDALANUVCHILAR BAZASI</div><h2>{filtered.length} ta yuklangan foydalanuvchi</h2></div><label className="market-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ism, telefon yoki email" /></label></div>{filtered.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th>Foydalanuvchi</th><th>Kontakt</th><th>Rollar</th><th>Hisob holati</th><th>Ro‘yxatdan o‘tgan</th></tr></thead><tbody>{filtered.map((row) => { const isProtectedSuperAdmin = row.roles.includes('SUPER_ADMIN') && !canAssignAdmin; const isSelf = row.id === currentUserId; return <tr key={row.id}><td><div className="user-table-cell"><div className="avatar avatar-tiny">{initials(row.fullName || row.phone)}</div><span className="table-primary">{row.fullName || 'Ism kiritilmagan'}</span></div></td><td className="muted-cell">{row.phone}{row.email ? <div>{row.email}</div> : null}</td><td><div className="roles-control">{roleOptions.map((role) => { const isAdminRole = role === 'ADMIN' || role === 'SUPER_ADMIN'; const disabled = isProtectedSuperAdmin || (isAdminRole && !canAssignAdmin) || (isSelf && (role === 'ADMIN' || role === 'SUPER_ADMIN') && row.roles.includes(role)); return <label key={role} title={disabled ? 'Bu rolni faqat Super Admin boshqaradi yoki o‘z admin rolingizni olib tashlay olmaysiz.' : undefined}><input type="checkbox" checked={row.roles.includes(role)} disabled={disabled} onChange={(event) => toggleRole(row, role, event.target.checked)} />{role === 'SUPER_ADMIN' ? 'Super Admin' : ROLE_LABELS[viewRole(role) || 'investor']}</label>; })}</div></td><td><select aria-label={`${row.phone} hisob holati`} value={row.accountStatus} disabled={isProtectedSuperAdmin || isSelf} onChange={(event) => onStatus(row.id, event.target.value as 'ACTIVE' | 'SUSPENDED' | 'CLOSED')}><option value="ACTIVE">Faol</option><option value="SUSPENDED">To‘xtatilgan</option><option value="CLOSED">Yopilgan</option><option value="PENDING" disabled>Kutilmoqda</option></select><span className={`status-chip ${row.accountStatus === 'ACTIVE' ? 'status-green' : 'status-honey'}`}><span />{labelStatus(row.accountStatus)}</span></td><td className="muted-cell">{formatDate(row.createdAt)}</td></tr>; })}</tbody></table></div> : <div className="empty-inline">Mos foydalanuvchi topilmadi.</div>}</section><div className="investment-disclaimer"><ShieldCheck size={16} /><div><strong>Rol xavfsizligi</strong><span>Admin va Super Admin huquqlarini faqat Super Admin tayinlay oladi. O‘zingizning yoki yagona Super Admin hisobining bloklanishi taqiqlanadi.</span></div></div></>;
+  return <><PageHeading eyebrow="ADMIN PANEL" title="Foydalanuvchilar" description="Foydalanuvchi rollari va hisob holatlarini boshqaring." /><div className="stats-grid compact-stats"><StatCard title="Yuklangan foydalanuvchi" value={`${users.length} ta`} helper="Joriy ro‘yxat" icon={Users} tone="green" /><StatCard title="Asalarichilar" value={`${users.filter((user) => user.roles.includes('BEEKEEPER')).length} ta`} helper="BEEKEEPER roli berilgan" icon={Sprout} tone="honey" /><StatCard title="To‘xtatilgan" value={`${users.filter((user) => user.accountStatus === 'SUSPENDED').length} ta`} helper="Hisob holati" icon={ShieldCheck} tone="blue" /></div><section className="panel full-table-panel"><div className="panel-heading"><div><div className="panel-kicker">FOYDALANUVCHILAR BAZASI</div><h2>{filtered.length} ta yuklangan foydalanuvchi</h2>{searchLoading && <span className="search-inline-loading"><LoaderCircle size={13} className="spin" /> Qidirilmoqda</span>}</div><label className="market-search"><Search size={15} /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ism, telefon yoki email" aria-label="Foydalanuvchini qidirish" /></label></div>{filtered.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th>Foydalanuvchi</th><th>Kontakt</th><th>Rollar</th><th>Hisob holati</th><th>Ro‘yxatdan o‘tgan</th></tr></thead><tbody>{filtered.map((row) => { const isProtectedSuperAdmin = row.roles.includes('SUPER_ADMIN') && !canAssignAdmin; const isSelf = row.id === currentUserId; return <tr key={row.id}><td><div className="user-table-cell"><div className="avatar avatar-tiny">{initials(row.fullName || row.phone)}</div><span className="table-primary">{row.fullName || 'Ism kiritilmagan'}</span></div></td><td className="muted-cell">{row.phone}{row.email ? <div>{row.email}</div> : null}</td><td><div className="roles-control">{roleOptions.map((role) => { const isAdminRole = role === 'ADMIN' || role === 'SUPER_ADMIN'; const disabled = isProtectedSuperAdmin || (isAdminRole && !canAssignAdmin) || (isSelf && (role === 'ADMIN' || role === 'SUPER_ADMIN') && row.roles.includes(role)); return <label key={role} title={disabled ? 'Bu rolni faqat Super Admin boshqaradi yoki o‘z admin rolingizni olib tashlay olmaysiz.' : undefined}><input type="checkbox" checked={row.roles.includes(role)} disabled={disabled} onChange={(event) => toggleRole(row, role, event.target.checked)} />{role === 'SUPER_ADMIN' ? 'Super Admin' : ROLE_LABELS[viewRole(role) || 'investor']}</label>; })}</div></td><td><select aria-label={`${row.phone} hisob holati`} value={row.accountStatus} disabled={isProtectedSuperAdmin || isSelf} onChange={(event) => onStatus(row.id, event.target.value as 'ACTIVE' | 'SUSPENDED' | 'CLOSED')}><option value="ACTIVE">Faol</option><option value="SUSPENDED">To‘xtatilgan</option><option value="CLOSED">Yopilgan</option><option value="PENDING" disabled>Kutilmoqda</option></select><span className={`status-chip ${row.accountStatus === 'ACTIVE' ? 'status-green' : 'status-honey'}`}><span />{labelStatus(row.accountStatus)}</span></td><td className="muted-cell">{formatDate(row.createdAt)}</td></tr>; })}</tbody></table></div> : <div className="empty-inline">Mos foydalanuvchi topilmadi.</div>}</section><div className="investment-disclaimer"><ShieldCheck size={16} /><div><strong>Rol xavfsizligi</strong><span>Admin va Super Admin huquqlarini faqat Super Admin tayinlay oladi. O‘zingizning yoki yagona Super Admin hisobining bloklanishi taqiqlanadi.</span></div></div></>;
 }
 
 function InvestorPaymentsPage({ payments }: { payments: PaymentDto[] }) {
@@ -1005,25 +1208,112 @@ function SettingsPage({ preferences, onSave }: { preferences: NotificationPrefer
   return <><PageHeading eyebrow="SOZLAMALAR" title="Bildirishnoma sozlamalari" description="O‘zingizga kerakli bildirishnomalarni tanlang." /><section className="panel settings-panel"><div className="settings-section-title"><div className="settings-icon"><Bell size={18} /></div><div><h2>Qabul qilinadigan bildirishnomalar</h2><p>{preferences ? `Oxirgi yangilanish: ${formatDate(preferences.updatedAt)}` : 'Sozlamalar hozircha mavjud emas.'}</p></div></div>{entries.map(([key, title, help]) => <label className="settings-row" key={key}><div><strong>{title}</strong><span>{help}</span></div><input type="checkbox" checked={draft[key]} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.checked }))} /></label>)}<button className="button button-primary" disabled={!preferences} onClick={() => onSave(draft)}>Sozlamalarni saqlash <Check size={15} /></button></section></>;
 }
 
-function ProfilePage({ user, role, onSave }: { user: UserProfile; role: Role; onSave: (fullName: string, email: string) => void }) {
+const MAX_PROFILE_IMAGE_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_PROFILE_IMAGE_DATA_LENGTH = 350_000;
+
+function prepareProfileImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!supportedTypes.includes(file.type)) {
+      reject(new Error('JPG, PNG yoki WebP formatidagi rasm tanlang.'));
+      return;
+    }
+    if (file.size > MAX_PROFILE_IMAGE_FILE_BYTES) {
+      reject(new Error('Rasm hajmi 5 MB dan oshmasligi kerak.'));
+      return;
+    }
+
+    const source = URL.createObjectURL(file);
+    const image = new Image();
+    image.onerror = () => { URL.revokeObjectURL(source); reject(new Error('Rasmni ochib bo‘lmadi. Boshqa fayl tanlang.')); };
+    image.onload = () => {
+      try {
+        const cropSize = Math.min(image.naturalWidth, image.naturalHeight);
+        if (!cropSize || image.naturalWidth > 8192 || image.naturalHeight > 8192) throw new Error('Rasm o‘lchami juda katta. Kichikroq rasm tanlang.');
+        const cropX = (image.naturalWidth - cropSize) / 2;
+        const cropY = (image.naturalHeight - cropSize) / 2;
+        for (const side of [512, 384, 320]) {
+          const canvas = document.createElement('canvas');
+          canvas.width = side;
+          canvas.height = side;
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('Rasmni tayyorlab bo‘lmadi.');
+          context.fillStyle = '#ffffff';
+          context.fillRect(0, 0, side, side);
+          context.drawImage(image, cropX, cropY, cropSize, cropSize, 0, 0, side, side);
+          for (const quality of [0.84, 0.74, 0.64, 0.54]) {
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            if (dataUrl.length <= MAX_PROFILE_IMAGE_DATA_LENGTH) {
+              resolve(dataUrl);
+              return;
+            }
+          }
+        }
+        reject(new Error('Rasmni siqib bo‘lmadi. Boshqa, kichikroq rasm tanlang.'));
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('Rasmni tayyorlab bo‘lmadi.'));
+      } finally {
+        URL.revokeObjectURL(source);
+      }
+    };
+    image.src = source;
+  });
+}
+
+function ProfilePage({ user, role, onSave }: { user: UserProfile; role: Role; onSave: (fullName: string, email: string, profileImageData: string) => Promise<void> }) {
   const [fullName, setFullName] = useState(user.fullName || '');
   const [email, setEmail] = useState(user.email || '');
-  useEffect(() => { setFullName(user.fullName || ''); setEmail(user.email || ''); }, [user.id, user.fullName, user.email]);
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSave(fullName.trim(), email.trim()); };
-  const hasName = Boolean(user.fullName?.trim());
-  const profileName = user.fullName?.trim() || 'Ism kiritilmagan';
+  const [profileImageData, setProfileImageData] = useState(user.profileImageData || '');
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setFullName(user.fullName || '');
+    setEmail(user.email || '');
+    setProfileImageData(user.profileImageData || '');
+  }, [user.id, user.fullName, user.email, user.profileImageData]);
+
+  const profileName = fullName.trim() || 'Ism kiritilmagan';
   const accountActive = user.accountStatus === 'ACTIVE';
   const accountStatus = labelStatus(user.accountStatus);
 
+  const changePhoto = async (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    if (!file) return;
+    setImageError('');
+    setImageBusy(true);
+    try {
+      setProfileImageData(await prepareProfileImage(file));
+    } catch (issue) {
+      setImageError(issue instanceof Error ? issue.message : 'Rasmni tayyorlab bo‘lmadi.');
+    } finally {
+      setImageBusy(false);
+      input.value = '';
+    }
+  };
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    try { await onSave(fullName.trim(), email.trim(), profileImageData); }
+    finally { setSaving(false); }
+  };
+
   return (
     <>
-      <PageHeading eyebrow="SHAXSIY KABINET" title="Profil va sozlamalar" description="Profil ma’lumotlarini yangilang va hisob holatini ko‘ring." />
+      <PageHeading eyebrow="SHAXSIY KABINET" title="Profil" description="Shaxsiy ma’lumotlar va hisob xavfsizligini boshqaring." />
       <div className="profile-layout">
         <section className="panel profile-card">
-          <div className="profile-cover"><span className="profile-cover-label">MELARIUM · SHAXSIY KABINET</span></div>
-          <form className="profile-main" onSubmit={submit}>
+          <form className="profile-main" onSubmit={(event) => void submit(event)}>
             <div className="profile-identity">
-              <div className="profile-avatar">{hasName ? initials(profileName) : 'M'}</div>
+              <div className="profile-avatar-wrap">
+                <div className="profile-avatar">
+                  {profileImageData ? <img src={profileImageData} alt="Profil rasmi" /> : <UserRound size={34} strokeWidth={1.7} />}
+                </div>
+                <input ref={photoInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Profil rasmi fayli" onChange={(event) => void changePhoto(event.currentTarget)} />
+              </div>
               <div className="profile-identity-copy">
                 <h2>{profileName}</h2>
                 <span className="profile-role">{ROLE_LABELS[role]}</span>
@@ -1032,16 +1322,24 @@ function ProfilePage({ user, role, onSave }: { user: UserProfile; role: Role; on
                 <span className="profile-account-dot" />{accountStatus}
               </span>
             </div>
-            <p className="profile-intro">Telefon raqam ushbu shaxsiy kabinetga bog‘langan.</p>
+
+            <div className="profile-photo-controls">
+              <button className="button button-outline profile-photo-button" type="button" onClick={() => photoInput.current?.click()} disabled={imageBusy || saving}>
+                <Camera size={15} />{imageBusy ? 'Rasm tayyorlanmoqda…' : profileImageData ? 'Boshqa rasm tanlash' : 'Profil rasmi qo‘shish'}
+              </button>
+              {profileImageData && <button className="profile-photo-remove" type="button" onClick={() => { setProfileImageData(''); setImageError(''); }} disabled={saving}><Trash2 size={14} /> Olib tashlash</button>}
+              <span className="profile-photo-help">JPG, PNG yoki WebP · 5 MB gacha</span>
+            </div>
+            {imageError && <div className="profile-image-error" role="alert">{imageError}</div>}
+
             <div className="profile-details" aria-label="Hisob ma’lumotlari">
               <div className="profile-detail"><span>Telefon raqam</span><strong>{user.phone}</strong></div>
-              <div className="profile-detail"><span>Elektron pochta</span><strong>{user.email || 'Kiritilmagan'}</strong></div>
               <div className="profile-detail"><span>Ro‘yxatdan o‘tgan</span><strong>{formatDate(user.createdAt)}</strong></div>
-              <div className="profile-detail"><span>Hisob holati</span><strong className={accountActive ? 'profile-green' : ''}>{accountStatus}</strong></div>
             </div>
+
             <div className="profile-edit-section">
               <div className="profile-edit-heading">
-                <div><h3>Shaxsiy ma’lumotlar</h3><p>Ism va email manzilingizni kiriting.</p></div>
+                <div><h3>Shaxsiy ma’lumotlar</h3><p>Ism familiya va email manzilingizni tahrirlang.</p></div>
               </div>
               <div className="profile-edit-grid">
                 <label className="profile-field">Ism familiya
@@ -1052,53 +1350,43 @@ function ProfilePage({ user, role, onSave }: { user: UserProfile; role: Role; on
                 </label>
               </div>
               <div className="profile-edit-actions">
-                <button className="button button-primary profile-save" type="submit"><Check size={16} /> Ma’lumotlarni saqlash</button>
+                <button className="button button-primary profile-save" type="submit" disabled={saving || imageBusy}>
+                  {saving ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}
+                  {saving ? 'Saqlanmoqda…' : 'O‘zgarishlarni saqlash'}
+                </button>
               </div>
             </div>
           </form>
         </section>
 
-        <section className="panel profile-security">
+        <aside className="panel profile-security">
           <div className="profile-security-header">
             <div>
               <div className="panel-kicker">HISOB XAVFSIZLIGI</div>
               <h2>Kirish va tasdiqlash</h2>
-              <p>Hisobingizga kirish ma’lumotlari.</p>
+              <p>Hisobingizga kirish usuli.</p>
             </div>
-            <span className="profile-security-icon"><ShieldCheck size={21} /></span>
-          </div>
-          <div className={`profile-security-status ${accountActive ? 'is-active' : 'is-inactive'}`}>
-            <span className="profile-security-status-icon"><ShieldCheck size={23} /></span>
-            <div className="profile-security-status-copy">
-              <span>Hisob holati</span>
-              <strong>{accountStatus}</strong>
-              <p>{accountActive ? 'Hisobingiz faol.' : 'Hisobingiz holati bo‘yicha yordam xizmatiga murojaat qiling.'}</p>
-            </div>
+            <span className="profile-security-icon"><ShieldCheck size={20} /></span>
           </div>
           <div className="profile-security-list">
             <div className="security-row">
-              <span className="security-icon"><PhoneIcon /></span>
+              <span className="security-icon"><Phone size={18} /></span>
               <div><strong>Telefon raqami</strong><span>{user.phone}</span></div>
-              <span className="security-tag"><CheckCircle2 size={14} /> OTP</span>
+              <span className="security-tag"><CheckCircle2 size={14} /> Tasdiqlangan</span>
             </div>
             <div className="security-row">
               <span className="security-icon"><ShieldCheck size={18} /></span>
-              <div><strong>Kirish usuli</strong><span>Bir martalik tasdiqlash kodi</span></div>
-              <span className="security-tag">Faol</span>
+              <div><strong>Kirish usuli</strong><span>Bir martalik SMS kodi (OTP)</span></div>
             </div>
           </div>
           <div className="profile-security-note">
             <CircleHelp size={17} />
-            <div><strong>Hisobingizni himoya qiling</strong><span>Tasdiqlash kodini boshqa odamga bermang. Ish tugagach, chap menyudagi chiqish tugmasidan foydalaning.</span></div>
+            <div><strong>Kodni hech kimga bermang</strong><span>Hisobingizdan chiqish uchun menyudagi chiqish tugmasidan foydalaning.</span></div>
           </div>
-        </section>
+        </aside>
       </div>
     </>
   );
-}
-
-function PhoneIcon() {
-  return <span className="phone-glyph">☎</span>;
 }
 
 function PublicPage({ listings, totalListings, onBrowse, onDetail, onContact }: { listings: Listing[]; totalListings: number; onBrowse: () => void; onDetail: (item: Listing) => void; onContact: () => void }) {

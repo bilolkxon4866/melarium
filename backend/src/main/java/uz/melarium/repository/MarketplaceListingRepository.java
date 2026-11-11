@@ -21,7 +21,8 @@ public interface MarketplaceListingRepository extends JpaRepository<MarketplaceL
             select listing from MarketplaceListing listing
             where listing.status = :status
               and (:query = '' or lower(listing.title) like lower(concat('%', :query, '%'))
-                   or lower(listing.location) like lower(concat('%', :query, '%')))
+                   or lower(listing.location) like lower(concat('%', :query, '%'))
+                   or lower(listing.description) like lower(concat('%', :query, '%')))
             order by listing.createdAt desc
             """)
     Page<MarketplaceListing> searchByStatus(

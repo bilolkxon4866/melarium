@@ -41,7 +41,7 @@ public class UserController {
     @Transactional
     public UserProfileResponse updateMe(@AuthenticationPrincipal AuthenticatedUser principal, @Valid @RequestBody UpdateProfileRequest body) {
         UserAccount user = getUser(principal);
-        user.updateProfile(body.fullName(), body.email());
+        user.updateProfile(body.fullName(), body.email(), body.profileImageData());
         user = userRepository.save(user);
         auditService.record(user.getId(), "USER_PROFILE_UPDATED", "USER", user.getId(), "SUCCESS", java.util.Map.of());
         return UserProfileResponse.from(user, roleService.rolesFor(user.getId()));

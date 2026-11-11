@@ -13,9 +13,10 @@ public record UserProfileResponse(
         String email,
         String accountStatus,
         List<String> roles,
-        Instant createdAt
+        Instant createdAt,
+        String profileImageData
 ) {
     public static UserProfileResponse from(UserAccount user, List<String> roles) {
-        return new UserProfileResponse(user.getId(), user.getPhone(), user.getFullName(), user.getEmail(), user.getAccountStatus(), roles, user.getCreatedAt());
+        return new UserProfileResponse(user.getId(), user.getPhone(), user.getFullName(), user.getEmail(), user.getAccountStatus(), roles, user.getCreatedAt(), user.getProfileImageData());
     }
 }

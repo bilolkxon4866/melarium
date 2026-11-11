@@ -26,6 +26,9 @@ public class UserAccount {
     @Column(length = 255)
     private String email;
 
+    @Column(name = "profile_image_data", columnDefinition = "text")
+    private String profileImageData;
+
     @Column(name = "account_status", nullable = false, length = 24)
     private String accountStatus = "PENDING";
 
@@ -54,9 +57,10 @@ public class UserAccount {
         this.accountStatus = "ACTIVE";
     }
 
-    public void updateProfile(String fullName, String email) {
+    public void updateProfile(String fullName, String email, String profileImageData) {
         if (fullName != null) this.fullName = fullName.trim();
         if (email != null) this.email = email.isBlank() ? null : email.trim().toLowerCase();
+        if (profileImageData != null) this.profileImageData = profileImageData.isBlank() ? null : profileImageData;
     }
 
     public void changeAccountStatus(String nextStatus) {
@@ -81,6 +85,7 @@ public class UserAccount {
     public String getPhone() { return phone; }
     public String getFullName() { return fullName; }
     public String getEmail() { return email; }
+    public String getProfileImageData() { return profileImageData; }
     public String getAccountStatus() { return accountStatus; }
     public Instant getPhoneVerifiedAt() { return phoneVerifiedAt; }
     public Instant getCreatedAt() { return createdAt; }
