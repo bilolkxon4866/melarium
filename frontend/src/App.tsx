@@ -292,6 +292,7 @@ function DashboardApp({ user, onUserUpdate, onLogout }: { user: UserProfile; onU
   const [activePage, setActivePage] = useState<PageId>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [modal, setModal] = useState<ModalId>(null);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [selectedApiary, setSelectedApiary] = useState<Apiary | null>(null);
@@ -330,7 +331,7 @@ function DashboardApp({ user, onUserUpdate, onLogout }: { user: UserProfile; onU
   const unreadCount = notifications.filter((item) => !item.read).length;
   const totalInvested = investments.filter((item) => item.status === 'Faol').reduce((sum, item) => sum + item.amount, 0);
 
-  const changePage = (page: PageId) => { setActivePage(page); setMobileMenuOpen(false); };
+  const changePage = (page: PageId) => { setActivePage(page); setMobileMenuOpen(false); setSearchOpen(false); if (page === 'profile') setSearchQuery(''); };
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3600); };
   const handleRoleChange = (nextRole: Role) => {
     if (!availableRoles.includes(nextRole)) return;
@@ -457,7 +458,7 @@ function DashboardApp({ user, onUserUpdate, onLogout }: { user: UserProfile; onU
 
   useEffect(() => {
     const query = searchQuery.trim();
-    if (activePage !== 'search' || !query) {
+    if ((!searchOpen && activePage !== 'search') || activePage === 'profile' || !query) {
       setRemoteSearchListings(null);
       setRemoteSearchUsers(null);
       setGlobalSearchLoading(false);
@@ -480,10 +481,10 @@ function DashboardApp({ user, onUserUpdate, onLogout }: { user: UserProfile; onU
         }).catch(() => undefined));
       }
       void Promise.all(requests).finally(() => { if (alive) setGlobalSearchLoading(false); });
-    }, 250);
+    }, 180);
 
     return () => { alive = false; window.clearTimeout(timer); };
-  }, [activePage, role, searchQuery]);
+  }, [activePage, role, searchOpen, searchQuery]);
 
   const searchResults = useMemo<SearchResult[]>(() => {
     const query = normalizeSearchText(searchQuery);
@@ -643,8 +644,8 @@ function DashboardApp({ user, onUserUpdate, onLogout }: { user: UserProfile; onU
     try { await api.reviewSupportTicket(id, status, adminNote); await refreshData(); showToast('Murojaat holati yangilandi.'); }
     catch (issue) { showToast(issue instanceof Error ? issue.message : 'Murojaatni yangilab bo‘lmadi.'); }
   };
-  const submitGlobalSearch = () => { if (!searchQuery.trim()) { showToast('Qidirish uchun so‘z kiriting.'); return; } changePage('search'); };
-  const selectSearchResult = (result: SearchResult) => { if (result.listing) { changePage('listings'); openListing(result.listing); } else changePage(result.page); };
+  const submitGlobalSearch = () => { if (!searchQuery.trim()) { showToast('Qidirish uchun so‘z kiriting.'); return; } setSearchOpen(false); changePage('search'); };
+  const selectSearchResult = (result: SearchResult) => { setSearchOpen(false); if (result.listing) { changePage('listings'); openListing(result.listing); } else changePage(result.page); };
 
   const renderPage = () => {
     if (activePage === 'search') return <SearchResultsPage query={searchQuery} results={searchResults} loading={globalSearchLoading} onSelect={selectSearchResult} />;
@@ -702,12 +703,38 @@ function DashboardApp({ user, onUserUpdate, onLogout }: { user: UserProfile; onU
         <header className="topbar">
           <div className="topbar-left"><button className="mobile-menu-button icon-plain" onClick={() => setMobileMenuOpen((open) => !open)} aria-label="Menyuni ochish"><Menu size={21} /></button><div className="breadcrumbs"><span>MELARIUM</span><ChevronRight size={14} /><strong>{pageTitle}</strong></div></div>
           <div className="topbar-actions">
-            <form className="global-search" role="search" onSubmit={(event) => { event.preventDefault(); submitGlobalSearch(); }}>
+            {activePage !== 'profile' && <form className="global-search" role="search" onSubmit={(event) => { event.preventDefault(); submitGlobalSearch(); }}>
               <button className="global-search-submit" type="submit" aria-label="Butun platformada qidirish"><Search size={17} /></button>
-              <input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Butun platformadan qidirish" aria-label="Butun platformadan qidirish" autoComplete="off" />
-              {searchQuery && <button className="global-search-clear" type="button" aria-label="Qidiruvni tozalash" onClick={() => setSearchQuery('')}><X size={14} /></button>}
+              <input
+                type="search"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={searchOpen && Boolean(searchQuery.trim())}
+                aria-controls="global-search-results"
+                value={searchQuery}
+                onChange={(event) => { const value = event.target.value; setSearchQuery(value); setSearchOpen(Boolean(value.trim())); }}
+                onFocus={() => { if (searchQuery.trim()) setSearchOpen(true); }}
+                onBlur={() => window.setTimeout(() => setSearchOpen(false), 160)}
+                onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }}
+                placeholder="Butun platformadan qidirish"
+                aria-label="Butun platformadan qidirish"
+                autoComplete="off"
+              />
+              {searchQuery && <button className="global-search-clear" type="button" aria-label="Qidiruvni tozalash" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchQuery(''); setSearchOpen(false); }}><X size={14} /></button>}
               <kbd aria-hidden="true"><CornerDownLeft size={13} /></kbd>
-            </form>
+              {searchOpen && searchQuery.trim() && <div className="global-search-results" id="global-search-results">
+                {globalSearchLoading && searchResults.length === 0 ? <div className="global-search-feedback"><LoaderCircle size={14} className="spin" /> Qidirilmoqda…</div> : searchResults.length > 0 ? <>
+                  {globalSearchLoading && <div className="global-search-pending"><LoaderCircle size={12} className="spin" /> Natijalar yangilanmoqda</div>}
+                  <div className="global-search-options" role="listbox" aria-label="Qidiruv takliflari">
+                    {searchResults.slice(0, 7).map((result) => { const Icon = result.icon; return <button type="button" role="option" aria-selected="false" className="global-search-result" key={result.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectSearchResult(result)}>
+                      <span className="global-search-result-icon"><Icon size={15} /></span>
+                      <span className="global-search-result-copy"><strong>{result.title}</strong><span>{result.category} · {result.subtitle}</span></span>
+                    </button>; })}
+                  </div>
+                  <button type="button" className="global-search-view-all" onMouseDown={(event) => event.preventDefault()} onClick={submitGlobalSearch}>Barcha natijalarni ko‘rish <ArrowRight size={14} /></button>
+                </> : <div className="global-search-feedback">Mos natija topilmadi</div>}
+              </div>}
+            </form>}
             {availableRoles.length > 1 && <label className="role-control" title="Sizga berilgan rolni tanlang"><span>Rol</span><select value={role} onChange={(event) => handleRoleChange(event.target.value as Role)} aria-label="Mavjud rolni tanlash">{availableRoles.map((item) => <option key={item} value={item}>{ROLE_LABELS[item]}</option>)}</select><ChevronDown size={14} /></label>}
             <button className="topbar-notification" onClick={() => changePage('notifications')} aria-label="Bildirishnomalar"><Bell size={19} />{unreadCount > 0 && <span className="notification-dot">{unreadCount}</span>}</button>
             <div className="topbar-divider" /><button className="top-profile" onClick={() => changePage('profile')}><div className="avatar avatar-small">{user.profileImageData ? <img src={user.profileImageData} alt="" /> : initials(fullName)}</div><div className="top-profile-copy"><strong>{fullName}</strong><span>{ROLE_LABELS[role]}</span></div><ChevronDown size={15} /></button>
@@ -726,7 +753,7 @@ function DashboardApp({ user, onUserUpdate, onLogout }: { user: UserProfile; onU
   );
 }
 
-function PageHeading({ eyebrow, title, description, action, onAction }: { eyebrow?: string; title: string; description?: string; action?: string; onAction?: () => void }) {
+function PageHeading({ eyebrow, title, description, action, onAction, actionIcon: ActionIcon = Plus }: { eyebrow?: string; title: string; description?: string; action?: string; onAction?: () => void; actionIcon?: LucideIcon | null }) {
   return (
     <div className="page-heading">
       <div>
@@ -734,7 +761,7 @@ function PageHeading({ eyebrow, title, description, action, onAction }: { eyebro
         <h1>{title}</h1>
         {description && <p>{description}</p>}
       </div>
-      {action && <button className="button button-primary" onClick={onAction}><Plus size={17} />{action}</button>}
+      {action && <button className="button button-primary" onClick={onAction}>{ActionIcon && <ActionIcon size={17} />}{action}</button>}
     </div>
   );
 }
@@ -1075,9 +1102,8 @@ function NotificationsPage({ notifications, onMarkAllRead, onRead }: { notificat
   const sorted = [...notifications].sort((a, b) => Number(a.read) - Number(b.read));
   const IconMap: Record<NotificationItem['kind'], LucideIcon> = { payment: CircleDollarSign, report: FileText, listing: Sprout, system: Bell };
   return <>
-    <PageHeading eyebrow="XABARLAR MARKAZI" title="Bildirishnomalar" description="Buyurtma, to‘lov va xo‘jalik yangilanishlari." action="Barchasini o‘qildi" onAction={onMarkAllRead} />
-    <div className="notification-summary"><span><span className="legend-dot legend-green" /> Barchasi <strong>{notifications.length}</strong></span><span><span className="legend-dot legend-honey" /> O‘qilmagan <strong>{notifications.filter((item) => !item.read).length}</strong></span><button onClick={onMarkAllRead}>Barchasini o‘qildi deb belgilash</button></div>
-    <div className="notification-list">{sorted.length ? sorted.map((item) => { const Icon = IconMap[item.kind]; return <article key={item.id} className={`notification-card ${!item.read ? 'unread' : ''}`}><span className={`notification-card-icon notify-${item.kind}`}><Icon size={18} /></span><div className="notification-copy"><strong>{item.title}</strong><p>{item.body}</p><time>{item.time}</time></div>{!item.read && <span className="unread-mark">Yangi</span>}<button className="button button-outline notification-read" disabled={item.read} onClick={() => void onRead(item.id)}>{item.read ? 'O‘qildi' : 'O‘qilgan deb belgilash'}</button></article>; }) : <div className="empty-state"><Bell size={24} /><strong>Bildirishnoma yo‘q</strong><span>Yangi yangilanishlar shu yerda ko‘rsatiladi.</span></div>}</div>
+    <PageHeading title="Bildirishnomalar" action="Barchasini o‘qildi" actionIcon={null} onAction={onMarkAllRead} />
+    <div className="notification-list">{sorted.length ? sorted.map((item) => { const Icon = IconMap[item.kind]; return <article key={item.id} className={`notification-card ${!item.read ? 'unread' : ''}`}><span className={`notification-card-icon notify-${item.kind}`}><Icon size={18} /></span><div className="notification-copy"><strong>{item.title}</strong><p>{item.body}</p><time>{item.time}</time><span className={`notification-status ${item.read ? 'is-read' : 'is-unread'}`}><span className="notification-status-dot" />{item.read ? 'O‘qilgan' : 'O‘qilmagan'}</span></div>{!item.read && <button className="button button-outline notification-read" onClick={() => void onRead(item.id)}>O‘qilgan deb belgilash</button>}</article>; }) : <div className="empty-state"><Bell size={24} /><strong>Bildirishnoma yo‘q</strong><span>Yangi yangilanishlar shu yerda ko‘rsatiladi.</span></div>}</div>
   </>;
 }
 
