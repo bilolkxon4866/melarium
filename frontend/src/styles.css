@@ -140,6 +140,8 @@ img { display: block; max-width: 100%; }
 .button-outline:hover { border-color: #afc7b3; background: #f8fbf8; }
 .button-white { border-color: rgba(255,255,255,.4); color: #fff; background: rgba(255,255,255,.1); backdrop-filter: blur(6px); }
 .button-white:hover { background: rgba(255,255,255,.2); }
+.public-hero-actions .button-white { border-color: #d5e4d6; color: #3a6f49; background: #fff; backdrop-filter: none; }
+.public-hero-actions .button-white:hover { border-color: #b8d0bb; background: #f5faf5; }
 
 .hero-banner { min-height: 196px; position: relative; overflow: hidden; margin-bottom: 19px; border-radius: 13px; background: #234a36; box-shadow: 0 8px 25px rgba(30, 63, 42, .12); }
 .hero-photo { position: absolute; inset: 0; background-image: url('/apiary.jpg'); background-size: cover; background-position: center 53%; transform: scale(1.02); }
@@ -896,3 +898,63 @@ img { display: block; max-width: 100%; }
 .apiary-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 13px; }
 .apiary-card-actions .text-link { margin: 0 auto 0 0; }
 .apiary-card-actions .table-cancel { min-height: 32px; padding: 5px 9px; }
+
+/* Mobile layout: keep the public brand visible and make small-screen controls readable. */
+.guest-header .brand { width: auto; padding: 0; }
+.guest-header .brand-copy strong { color: #244a37; }
+.guest-header .brand-copy small { color: #718476; }
+
+@media (max-width: 760px) {
+  .button { min-height: 40px; font-size: 12px; }
+  .page-heading h1 { font-size: 21px; }
+  .page-heading p { font-size: 12px; line-height: 1.5; }
+  .page-heading .button { min-height: 40px; padding: 0 11px; font-size: 12px; }
+  .eyebrow, .panel-kicker { font-size: 10px; }
+  .panel-heading h2 { font-size: 15px; }
+  .panel-heading p { font-size: 11px; }
+  .stat-title { font-size: 10px; }
+  .stat-value { font-size: 18px; }
+  .stat-helper { font-size: 9px; }
+  .global-search input { font-size: 12px; }
+  .nav-item { font-size: 13px; }
+  .data-table th { font-size: 9px; }
+  .data-table td { font-size: 10px; }
+  .modal-form label { font-size: 11px; }
+  .modal-form input, .modal-form select, .modal-form textarea { min-height: 44px; font-size: 16px; }
+  .auth-form > p { font-size: 13px; }
+  .auth-form > label { font-size: 12px; }
+  .auth-email-input, .auth-phone-field input, .auth-code-input { font-size: 16px; }
+  .auth-hint { font-size: 11px; }
+  .auth-submit { min-height: 44px; font-size: 13px; }
+  .public-hero-copy > p { font-size: 13px; }
+  .public-hero-actions .button { min-height: 44px; font-size: 12px; line-height: 1.3; white-space: normal; }
+  .public-trust { flex-wrap: wrap; font-size: 10px; line-height: 1.4; }
+  .public-metrics span { font-size: 10px; line-height: 1.4; }
+  .public-image-card strong { font-size: 11px; }
+  .public-image-card span:not(.public-image-icon) { font-size: 10px; }
+  .public-faq summary { font-size: 14px; }
+  .public-faq details p { font-size: 13px; }
+}
+
+@media (max-width: 540px) {
+  .guest-header { height: auto; min-height: 68px; padding: 10px 14px; gap: 8px; flex-wrap: wrap; }
+  .guest-header .brand { flex: 1 1 100%; }
+  .guest-header .brand-copy small { display: block; }
+  .guest-header > div { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 8px; }
+  .guest-header > div .button { min-height: 44px; padding: 8px 10px; font-size: 12px; line-height: 1.25; white-space: normal; }
+  .guest-main { width: calc(100% - 24px); }
+}
+
+@media (max-width: 420px) {
+  .guest-header { padding: 10px 12px; }
+  .guest-header > div .button { padding: 8px; font-size: 11px; }
+  .public-hero-actions { width: 100%; flex-direction: column; }
+  .public-hero-actions .button { width: 100%; }
+  .public-trust { flex-direction: column; align-items: flex-start; }
+  .public-hero-image { min-height: 170px; }
+  .public-metrics { gap: 12px 6px; padding: 12px; }
+  .public-metrics > div { padding-left: 8px; }
+  .mini-listing-content > strong, .mini-listing-bottom { font-size: 10px; }
+  .listing-title-button h3 { font-size: 12px; }
+  .listing-stats strong { font-size: 10px; }
+}
